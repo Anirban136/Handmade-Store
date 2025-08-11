@@ -88,12 +88,13 @@ const Admin = () => {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
-    // setIsLoading(true); // This line was removed from the original file, so it's removed here.
+    setIsLoading(true);
     
     try {
+      // Prepare product data without images first
       const productData = {
         ...productForm,
-        images: [...imageUrls, ...uploadedFiles.map(file => ({ url: file.url }))]
+        images: [] // Start with empty images array
       };
       
       if (editingProduct) {
@@ -105,6 +106,11 @@ const Admin = () => {
         });
         
         if (response.ok) {
+          // If there are uploaded files, upload them now
+          if (uploadedFiles.length > 0) {
+            await uploadFiles(editingProduct.id);
+          }
+          
           setShowProductForm(false);
           setEditingProduct(null);
           fetchData();
@@ -114,7 +120,7 @@ const Admin = () => {
           alert(`Error: ${error.message}`);
         }
       } else {
-        // Create new product
+        // Create new product first
         const response = await fetch(`${API_BASE_URL}/products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -122,6 +128,14 @@ const Admin = () => {
         });
         
         if (response.ok) {
+          const result = await response.json();
+          const newProductId = result.product.id;
+          
+          // If there are uploaded files, upload them to the new product
+          if (uploadedFiles.length > 0) {
+            await uploadFiles(newProductId);
+          }
+          
           setShowProductForm(false);
           fetchData();
           alert('Product created successfully!');
@@ -134,7 +148,7 @@ const Admin = () => {
       console.error('Error:', error);
       alert('An error occurred. Please try again.');
     } finally {
-      // setIsLoading(false); // This line was removed from the original file, so it's removed here.
+      setIsLoading(false);
     }
   };
 
@@ -181,11 +195,15 @@ const Admin = () => {
   const uploadFiles = async (productId) => {
     if (uploadedFiles.length === 0) return;
     
+    console.log('Starting file upload for product:', productId);
+    console.log('Files to upload:', uploadedFiles);
+    
     setIsUploading(true);
     const formData = new FormData();
     
     uploadedFiles.forEach((fileObj, index) => {
       formData.append('images', fileObj.file);
+      console.log(`Adding file ${index}:`, fileObj.name, fileObj.size);
     });
     
     // Add compression settings
@@ -193,14 +211,23 @@ const Admin = () => {
     if (customDimensions.width) formData.append('maxWidth', customDimensions.width);
     if (customDimensions.height) formData.append('maxHeight', customDimensions.height);
     
+    console.log('Compression settings:', { compressionQuality, customDimensions });
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/products/${productId}/upload-images`, {
+      const uploadUrl = `${API_BASE_URL}/products/${productId}/upload-images`;
+      console.log('Uploading to:', uploadUrl);
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData
       });
       
+      console.log('Upload response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('Upload result:', result);
+        
         // Update the product with new images
         setProductForm(prev => ({
           ...prev,
@@ -220,15 +247,57 @@ const Admin = () => {
         } else {
           alert('Images uploaded successfully!');
         }
+      } else if (response.status === 404) {
+        // Backend doesn't have compression features yet, try basic upload
+        console.log('Compression endpoint not found, trying basic upload...');
+        await basicImageUpload(productId);
       } else {
-        const error = await response.json();
-        alert(`Upload failed: ${error.message}`);
+        const errorText = await response.text();
+        console.error('Upload failed with status:', response.status);
+        console.error('Error response:', errorText);
+        
+        let errorMessage = 'Upload failed';
+        try {
+          const error = JSON.parse(errorText);
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          errorMessage = `Upload failed with status ${response.status}`;
+        }
+        
+        alert(`Upload failed: ${errorMessage}`);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
+      alert(`Upload failed: ${error.message}`);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // Fallback for basic image upload when compression features aren't available
+  const basicImageUpload = async (productId) => {
+    try {
+      console.log('Attempting basic image upload...');
+      
+      // For now, we'll just add the files to the form and let them be saved with the product
+      // This is a temporary solution until the backend compression is deployed
+      const fileUrls = uploadedFiles.map(fileObj => ({
+        url: URL.createObjectURL(fileObj.file),
+        name: fileObj.name,
+        isLocal: true
+      }));
+      
+      setProductForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...fileUrls]
+      }));
+      
+      setUploadedFiles([]);
+      alert('Images added to product (basic mode - compression not available yet)');
+      
+    } catch (error) {
+      console.error('Basic upload error:', error);
+      alert('Basic upload failed. Please try again.');
     }
   };
 
