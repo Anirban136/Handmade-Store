@@ -127,11 +127,6 @@ const Login = () => {
               </Link>
             </p>
           </div>
-
-          <div className="demo-credentials">
-            <h4>Demo Credentials:</h4>
-            <p><strong>Admin:</strong> admin@handycurv.com / admin123</p>
-          </div>
         </div>
       </div>
     </div>

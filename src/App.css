@@ -2108,26 +2108,6 @@ body {
   font-size: 0.9rem;
 }
 
-.demo-credentials {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border-left: 4px solid #8B4513;
-}
-
-.demo-credentials h4 {
-  margin: 0 0 0.5rem 0;
-  color: #2c3e50;
-  font-size: 0.9rem;
-}
-
-.demo-credentials p {
-  margin: 0.25rem 0;
-  font-size: 0.8rem;
-  color: #7f8c8d;
-}
-
 /* Navbar Auth Buttons */
 .auth-buttons {
   display: flex;
