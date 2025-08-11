@@ -4,6 +4,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { fileStorage } = require('../utils/fileStorage');
+const ImageCompressor = require('../utils/imageCompressor');
+
+// Initialize image compressor
+const imageCompressor = new ImageCompressor();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -25,7 +29,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024, // Increased to 10MB for original files
   },
   fileFilter: (req, file, cb) => {
     // Check file type
@@ -358,19 +362,21 @@ router.patch('/products/:id/images', (req, res) => {
   }
 });
 
-// Upload product image
-router.post('/products/:id/upload-image', upload.single('image'), (req, res) => {
+// Upload product image with smart compression
+router.post('/products/:id/upload-image', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
+    const { compressionQuality = 'auto', maxWidth, maxHeight } = req.body;
+    
     const product = inMemoryDB.products.find(p => p.id === id);
-
+    
     if (!product) {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
-
+    
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -378,15 +384,94 @@ router.post('/products/:id/upload-image', upload.single('image'), (req, res) => 
       });
     }
 
-    const newImageUrl = `/uploads/products/${req.file.filename}`;
+    const originalPath = req.file.path;
+    const filename = path.basename(req.file.filename, path.extname(req.file.filename));
+    const compressedPath = path.join(path.dirname(originalPath), `${filename}-compressed.webp`);
+    
+    // Compression options based on quality setting
+    let compressionOptions = {};
+    switch (compressionQuality) {
+      case 'high':
+        compressionOptions = { quality: 70, maxWidth: 800, maxHeight: 800 };
+        break;
+      case 'medium':
+        compressionOptions = { quality: 85, maxWidth: 1000, maxHeight: 1000 };
+        break;
+      case 'low':
+        compressionOptions = { quality: 95, maxWidth: 1200, maxHeight: 1200 };
+        break;
+      case 'auto':
+      default:
+        // Auto-detect based on file size
+        const stats = fs.statSync(originalPath);
+        const fileSizeMB = stats.size / (1024 * 1024);
+        if (fileSizeMB > 3) {
+          compressionOptions = { quality: 75, maxWidth: 800, maxHeight: 800 };
+        } else if (fileSizeMB > 1) {
+          compressionOptions = { quality: 85, maxWidth: 1000, maxHeight: 1000 };
+        } else {
+          compressionOptions = { quality: 90, maxWidth: 1200, maxHeight: 1200 };
+        }
+        break;
+    }
+    
+    // Override with custom dimensions if provided
+    if (maxWidth) compressionOptions.maxWidth = parseInt(maxWidth);
+    if (maxHeight) compressionOptions.maxHeight = parseInt(maxHeight);
+    
+    // Compress the image
+    const compressionResult = await imageCompressor.compressImage(
+      originalPath, 
+      compressedPath, 
+      compressionOptions
+    );
+    
+    if (!compressionResult.success) {
+      // If compression fails, use original file
+      const newImageUrl = `/uploads/products/${req.file.filename}`;
+      product.images.push({ url: newImageUrl });
+      product.updatedAt = new Date().toISOString();
+      
+      // Clean up original file
+      fs.unlinkSync(originalPath);
+      
+      if (saveProducts()) {
+        res.json({
+          success: true,
+          message: 'Image uploaded successfully (original file used)',
+          product,
+          compression: { success: false, reason: 'Compression failed' }
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to save product'
+        });
+      }
+      return;
+    }
+    
+    // Use compressed image
+    const newImageUrl = `/uploads/products/${path.basename(compressedPath)}`;
     product.images.push({ url: newImageUrl });
     product.updatedAt = new Date().toISOString();
-
+    
+    // Clean up original file
+    fs.unlinkSync(originalPath);
+    
     if (saveProducts()) {
       res.json({
         success: true,
-        message: 'Image uploaded successfully',
-        product
+        message: 'Image uploaded and compressed successfully',
+        product,
+        compression: {
+          success: true,
+          originalSize: `${(compressionResult.originalSize / (1024 * 1024)).toFixed(2)} MB`,
+          compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(2)} MB`,
+          compressionRatio: compressionResult.compressionRatio,
+          dimensions: compressionResult.dimensions,
+          format: compressionResult.format
+        }
       });
     } else {
       res.status(500).json({
@@ -447,10 +532,12 @@ router.delete('/products/:id/images/:imageIndex', (req, res) => {
   }
 });
 
-// Bulk upload images for a product
-router.post('/products/:id/upload-images', upload.array('images', 10), (req, res) => {
+// Bulk upload images for a product with smart compression
+router.post('/products/:id/upload-images', upload.array('images', 10), async (req, res) => {
   try {
     const { id } = req.params;
+    const { compressionQuality = 'auto', maxWidth, maxHeight } = req.body;
+    
     const product = inMemoryDB.products.find(p => p.id === id);
     
     if (!product) {
@@ -467,9 +554,79 @@ router.post('/products/:id/upload-images', upload.array('images', 10), (req, res
       });
     }
     
-    const newImages = req.files.map(file => ({
-      url: `/uploads/products/${file.filename}`
-    }));
+    const compressionResults = [];
+    const newImages = [];
+    
+    // Process each uploaded file
+    for (const file of req.files) {
+      const originalPath = file.path;
+      const filename = path.basename(file.filename, path.extname(file.filename));
+      const compressedPath = path.join(path.dirname(originalPath), `${filename}-compressed.webp`);
+      
+      // Compression options based on quality setting
+      let compressionOptions = {};
+      switch (compressionQuality) {
+        case 'high':
+          compressionOptions = { quality: 70, maxWidth: 800, maxHeight: 800 };
+          break;
+        case 'medium':
+          compressionOptions = { quality: 85, maxWidth: 1000, maxHeight: 1000 };
+          break;
+        case 'low':
+          compressionOptions = { quality: 95, maxWidth: 1200, maxHeight: 1200 };
+          break;
+        case 'auto':
+        default:
+          // Auto-detect based on file size
+          const stats = fs.statSync(originalPath);
+          const fileSizeMB = stats.size / (1024 * 1024);
+          if (fileSizeMB > 3) {
+            compressionOptions = { quality: 75, maxWidth: 800, maxHeight: 800 };
+          } else if (fileSizeMB > 1) {
+            compressionOptions = { quality: 85, maxWidth: 1000, maxHeight: 1000 };
+          } else {
+            compressionOptions = { quality: 90, maxWidth: 1200, maxHeight: 1200 };
+          }
+          break;
+      }
+      
+      // Override with custom dimensions if provided
+      if (maxWidth) compressionOptions.maxWidth = parseInt(maxWidth);
+      if (maxHeight) compressionOptions.maxHeight = parseInt(maxHeight);
+      
+      // Compress the image
+      const compressionResult = await imageCompressor.compressImage(
+        originalPath, 
+        compressedPath, 
+        compressionOptions
+      );
+      
+      if (compressionResult.success) {
+        // Use compressed image
+        const newImageUrl = `/uploads/products/${path.basename(compressedPath)}`;
+        newImages.push({ url: newImageUrl });
+        compressionResults.push({
+          filename: file.originalname,
+          success: true,
+          originalSize: `${(compressionResult.originalSize / (1024 * 1024)).toFixed(2)} MB`,
+          compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(2)} MB`,
+          compressionRatio: compressionResult.compressionRatio,
+          dimensions: compressionResult.dimensions
+        });
+        
+        // Clean up original file
+        fs.unlinkSync(originalPath);
+      } else {
+        // If compression fails, use original file
+        const newImageUrl = `/uploads/products/${file.filename}`;
+        newImages.push({ url: newImageUrl });
+        compressionResults.push({
+          filename: file.originalname,
+          success: false,
+          reason: 'Compression failed'
+        });
+      }
+    }
     
     product.images.push(...newImages);
     product.updatedAt = new Date().toISOString();
@@ -478,7 +635,13 @@ router.post('/products/:id/upload-images', upload.array('images', 10), (req, res
       res.json({
         success: true,
         message: `${newImages.length} images uploaded successfully`,
-        product
+        product,
+        compression: {
+          totalImages: req.files.length,
+          successful: compressionResults.filter(r => r.success).length,
+          failed: compressionResults.filter(r => !r.success).length,
+          results: compressionResults
+        }
       });
     } else {
       res.status(500).json({

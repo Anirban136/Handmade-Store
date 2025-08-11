@@ -311,6 +311,121 @@
   font-size: 1rem;
 }
 
+/* Compression Settings */
+.compression-settings {
+  margin-bottom: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.compression-toggle-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  transition: background-color 0.3s ease;
+}
+
+.compression-toggle-btn:hover {
+  background: #e9ecef;
+}
+
+.compression-options {
+  padding: 1rem;
+  background: #f8f9fa;
+}
+
+.compression-quality {
+  margin-bottom: 1rem;
+}
+
+.compression-quality label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.compression-quality select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.custom-dimensions {
+  margin-bottom: 1rem;
+}
+
+.custom-dimensions label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.dimension-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.dimension-inputs input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.dimension-inputs span {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.custom-dimensions small {
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+.compression-info {
+  background: white;
+  border-radius: 4px;
+  padding: 0.75rem;
+  border-left: 3px solid #17a2b8;
+}
+
+.compression-info p {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.compression-info ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+.compression-info li {
+  margin: 0.25rem 0;
+}
+
 .drag-drop-zone {
   border: 2px dashed #bdc3c7;
   border-radius: 8px;

@@ -33,6 +33,9 @@ const Admin = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [compressionQuality, setCompressionQuality] = useState('auto');
+  const [customDimensions, setCustomDimensions] = useState({ width: '', height: '' });
+  const [showCompressionSettings, setShowCompressionSettings] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -185,6 +188,11 @@ const Admin = () => {
       formData.append('images', fileObj.file);
     });
     
+    // Add compression settings
+    formData.append('compressionQuality', compressionQuality);
+    if (customDimensions.width) formData.append('maxWidth', customDimensions.width);
+    if (customDimensions.height) formData.append('maxHeight', customDimensions.height);
+    
     try {
       const response = await fetch(`${API_BASE_URL}/products/${productId}/upload-images`, {
         method: 'POST',
@@ -199,7 +207,19 @@ const Admin = () => {
           images: [...prev.images, ...result.product.images.slice(-uploadedFiles.length)]
         }));
         setUploadedFiles([]);
-        alert('Images uploaded successfully!');
+        
+        // Show compression results
+        if (result.compression) {
+          const successCount = result.compression.successful;
+          const totalCount = result.compression.totalImages;
+          const avgCompression = result.compression.results
+            .filter(r => r.success && r.compressionRatio)
+            .reduce((sum, r) => sum + parseFloat(r.compressionRatio), 0) / successCount || 0;
+          
+          alert(`Images uploaded successfully!\n\n📊 Compression Results:\n• ${successCount}/${totalCount} images compressed\n• Average compression: ${avgCompression.toFixed(1)}%\n• Format: WebP for better quality`);
+        } else {
+          alert('Images uploaded successfully!');
+        }
       } else {
         const error = await response.json();
         alert(`Upload failed: ${error.message}`);
@@ -543,6 +563,69 @@ const Admin = () => {
                       {/* File Upload Section */}
                       <div className="file-upload-section">
                         <h4>📁 Upload Files:</h4>
+                        
+                        {/* Compression Settings */}
+                        <div className="compression-settings">
+                          <button 
+                            type="button" 
+                            className="compression-toggle-btn"
+                            onClick={() => setShowCompressionSettings(!showCompressionSettings)}
+                          >
+                            <FaImage /> Compression Settings {showCompressionSettings ? '▼' : '▶'}
+                          </button>
+                          
+                          {showCompressionSettings && (
+                            <div className="compression-options">
+                              <div className="compression-quality">
+                                <label>Compression Quality:</label>
+                                <select 
+                                  value={compressionQuality} 
+                                  onChange={(e) => setCompressionQuality(e.target.value)}
+                                >
+                                  <option value="auto">🤖 Auto (Smart Detection)</option>
+                                  <option value="high">🔥 High (70% - Small files, fast loading)</option>
+                                  <option value="medium">⚡ Medium (85% - Balanced quality/size)</option>
+                                  <option value="low">💎 Low (95% - High quality, larger files)</option>
+                                </select>
+                              </div>
+                              
+                              <div className="custom-dimensions">
+                                <label>Custom Dimensions (optional):</label>
+                                <div className="dimension-inputs">
+                                  <input
+                                    type="number"
+                                    placeholder="Max Width (px)"
+                                    value={customDimensions.width}
+                                    onChange={(e) => setCustomDimensions(prev => ({ ...prev, width: e.target.value }))}
+                                    min="100"
+                                    max="2000"
+                                  />
+                                  <span>×</span>
+                                  <input
+                                    type="number"
+                                    placeholder="Max Height (px)"
+                                    value={customDimensions.height}
+                                    onChange={(e) => setCustomDimensions(prev => ({ ...prev, height: e.target.value }))}
+                                    min="100"
+                                    max="2000"
+                                  />
+                                </div>
+                                <small>Leave empty to use quality-based auto-sizing</small>
+                              </div>
+                              
+                              <div className="compression-info">
+                                <p><strong>💡 Smart Features:</strong></p>
+                                <ul>
+                                  <li>🔄 Automatic format conversion to WebP</li>
+                                  <li>📐 Smart resizing with aspect ratio preservation</li>
+                                  <li>🎯 Quality-based compression recommendations</li>
+                                  <li>🧹 Original files automatically cleaned up</li>
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
                         <div 
                           className={`drag-drop-zone ${dragActive ? 'drag-active' : ''}`}
                           onDragEnter={handleDrag}
@@ -561,7 +644,7 @@ const Admin = () => {
                           <label htmlFor="file-upload" className="file-input-label">
                             <FaUpload className="upload-icon" />
                             <span>Drag & drop images here or click to select</span>
-                            <small>Max 10 images, 5MB each</small>
+                            <small>Max 10 images, 10MB each (will be compressed)</small>
                           </label>
                         </div>
                         
