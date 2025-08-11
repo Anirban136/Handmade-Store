@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaShoppingCart, FaBars, FaTimes, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaShoppingCart, FaBars, FaTimes, FaUser, FaSignOutAlt, FaHeart } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { getCartCount } = useCart();
+  const { getWishlistCount } = useWishlist();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -37,6 +39,10 @@ const Navbar = () => {
         </ul>
 
         <div className="nav-right">
+          <Link to="/wishlist" className="wishlist-icon">
+            <FaHeart size={20} />
+            {getWishlistCount() > 0 && <span className="wishlist-count">{getWishlistCount()}</span>}
+          </Link>
           <Link to="/cart" className="cart-icon">
             <FaShoppingCart size={20} />
             {getCartCount() > 0 && <span className="cart-count">{getCartCount()}</span>}

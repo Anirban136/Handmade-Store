@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaSearch, FaHeart, FaSpinner } from 'react-icons/fa';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 import { formatPrice } from '../utils/priceFormatter';
 
 const Products = () => {
   const { products, loading, error, filters, searchProducts, filterByCategory, clearFilters } = useProducts();
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
-  const [wishlist, setWishlist] = useState([]);
 
   // Categories from backend
   const categories = ['All', 'Pottery', 'Textiles', 'Jewelry', 'Kitchen', 'Art', 'Stationery', 'Home Decor'];
@@ -33,17 +34,6 @@ const Products = () => {
     } else {
       filterByCategory(category);
     }
-  };
-
-  // Handle wishlist toggle
-  const toggleWishlist = (productId) => {
-    setWishlist(prev => {
-      if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
-      } else {
-        return [...prev, productId];
-      }
-    });
   };
 
   // Sort products
@@ -177,9 +167,9 @@ const Products = () => {
                       Add to Cart
                     </button>
                     <button 
-                      className={`wishlist-btn ${wishlist.includes(product.id) ? 'active' : ''}`}
-                      onClick={() => toggleWishlist(product.id)}
-                      title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                      className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
+                      onClick={() => toggleWishlist(product)}
+                      title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                     >
                       <FaHeart />
                     </button>

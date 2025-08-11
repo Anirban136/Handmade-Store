@@ -4,22 +4,19 @@ import { FaStar, FaHeart, FaShare, FaTruck, FaShieldAlt, FaUndo } from 'react-ic
 import { products } from '../data/products';
 import { formatPrice } from '../utils/priceFormatter';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [wishlist, setWishlist] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
   
   useEffect(() => {
     const foundProduct = products.find(p => p.id === parseInt(id));
     setProduct(foundProduct);
-    // Initialize wishlist with product if it's in stock
-    if (foundProduct && foundProduct.inStock) {
-      setWishlist(prev => [...prev, foundProduct.id]);
-    }
   }, [id]);
   
   if (!product) {
@@ -43,7 +40,7 @@ const ProductDetail = () => {
   ];
 
   const handleAddToCart = () => {
-    addToCart(product.id, quantity);
+    addToCart(product, quantity);
     alert(`${quantity} ${product.name} added to cart!`);
   };
 
@@ -53,15 +50,7 @@ const ProductDetail = () => {
     }
   };
 
-  const toggleWishlist = (productId) => {
-    setWishlist(prev => {
-      if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
-      } else {
-        return [...prev, productId];
-      }
-    });
-  };
+
 
   return (
     <div className="product-detail-page">
@@ -159,8 +148,8 @@ const ProductDetail = () => {
                   Add to Cart
                 </button>
                 <button 
-                  className={`wishlist-btn large ${wishlist.includes(product.id) ? 'active' : ''}`}
-                  onClick={() => toggleWishlist(product.id)}
+                  className={`wishlist-btn large ${isInWishlist(product.id) ? 'active' : ''}`}
+                  onClick={() => toggleWishlist(product)}
                 >
                   <FaHeart />
                 </button>
@@ -221,12 +210,12 @@ const ProductDetail = () => {
                       >
                         Add to Cart
                       </button>
-                      <button 
-                        className={`wishlist-btn ${wishlist.includes(relatedProduct.id) ? 'active' : ''}`}
-                        onClick={() => toggleWishlist(relatedProduct.id)}
-                      >
-                        <FaHeart />
-                      </button>
+                                           <button 
+                       className={`wishlist-btn ${isInWishlist(relatedProduct.id) ? 'active' : ''}`}
+                       onClick={() => toggleWishlist(relatedProduct)}
+                     >
+                       <FaHeart />
+                     </button>
                     </div>
                   </div>
                 </div>

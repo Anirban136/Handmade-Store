@@ -1,25 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShippingFast, FaShieldAlt, FaHandshake } from 'react-icons/fa';
 import { products } from '../data/products';
 import { formatPrice } from '../utils/priceFormatter';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 const Home = () => {
   const { addToCart } = useCart();
-  const [wishlist, setWishlist] = useState([]);
+  const { toggleWishlist, isInWishlist } = useWishlist();
   const featuredProducts = products.slice(0, 4);
-
-  // Handle wishlist toggle
-  const toggleWishlist = (productId) => {
-    setWishlist(prev => {
-      if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
-      } else {
-        return [...prev, productId];
-      }
-    });
-  };
 
   return (
     <div className="home">
@@ -68,9 +58,13 @@ const Home = () => {
         <div className="products-grid">
           {featuredProducts.map((product) => (
             <div key={product.id} className="product-card">
-              <img src={product.image} alt={product.name} className="product-image" />
+              <Link to={`/product/${product.id}`}>
+                <img src={product.image} alt={product.name} className="product-image" />
+              </Link>
               <div className="product-info">
-                <h3 className="product-title">{product.name}</h3>
+                <Link to={`/product/${product.id}`}>
+                  <h3 className="product-title">{product.name}</h3>
+                </Link>
                 <div className="product-rating">
                   {[...Array(5)].map((_, i) => (
                     <FaStar 
@@ -85,9 +79,9 @@ const Home = () => {
                 <div className="product-actions">
                   <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
                   <button 
-                    className={`wishlist-btn ${wishlist.includes(product.id) ? 'active' : ''}`}
-                    onClick={() => toggleWishlist(product.id)}
-                    title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                    className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
+                    onClick={() => toggleWishlist(product)}
+                    title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                   >
                     <FaHeart />
                   </button>
