@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShippingFast, FaShieldAlt, FaHandshake } from 'react-icons/fa';
 import { products } from '../data/products';
 import { formatPrice } from '../utils/priceFormatter';
+import { useCart } from '../context/CartContext';
 
-const Home = ({ addToCart }) => {
+const Home = () => {
+  const { addToCart } = useCart();
   const featuredProducts = products.slice(0, 4);
 
   return (
