@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShippingFast, FaShieldAlt, FaHandshake } from 'react-icons/fa';
 import { products } from '../data/products';
@@ -7,7 +7,19 @@ import { useCart } from '../context/CartContext';
 
 const Home = () => {
   const { addToCart } = useCart();
+  const [wishlist, setWishlist] = useState([]);
   const featuredProducts = products.slice(0, 4);
+
+  // Handle wishlist toggle
+  const toggleWishlist = (productId) => {
+    setWishlist(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
+  };
 
   return (
     <div className="home">
@@ -70,7 +82,16 @@ const Home = () => {
                 </div>
                 <p className="product-price">{formatPrice(product.price)}</p>
                 <p className="product-description">{product.description.substring(0, 100)}...</p>
-                <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
+                <div className="product-actions">
+                  <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
+                  <button 
+                    className={`wishlist-btn ${wishlist.includes(product.id) ? 'active' : ''}`}
+                    onClick={() => toggleWishlist(product.id)}
+                    title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                  >
+                    <FaHeart />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

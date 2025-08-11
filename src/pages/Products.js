@@ -10,6 +10,7 @@ const Products = () => {
   const { addToCart } = useCart();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
+  const [wishlist, setWishlist] = useState([]);
 
   // Categories from backend
   const categories = ['All', 'Pottery', 'Textiles', 'Jewelry', 'Kitchen', 'Art', 'Stationery', 'Home Decor'];
@@ -34,6 +35,17 @@ const Products = () => {
     }
   };
 
+  // Handle wishlist toggle
+  const toggleWishlist = (productId) => {
+    setWishlist(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
+  };
+
   // Sort products
   const sortedProducts = [...products].sort((a, b) => {
     switch (sortBy) {
@@ -42,7 +54,7 @@ const Products = () => {
       case 'price-high':
         return b.price - a.price;
       case 'rating':
-        return b.ratings - a.ratings;
+        return b.rating - a.rating;
       case 'name':
       default:
         return a.name.localeCompare(b.name);
@@ -134,7 +146,7 @@ const Products = () => {
               <div key={product.id} className="product-card">
                 <Link to={`/product/${product.id}`}>
                   <img 
-                    src={product.images?.[0]?.url || product.image} 
+                    src={product.image} 
                     alt={product.name} 
                     className="product-image" 
                   />
@@ -147,10 +159,10 @@ const Products = () => {
                     {[...Array(5)].map((_, i) => (
                       <FaStar 
                         key={i} 
-                        className={i < Math.floor(product.ratings || 0) ? 'star filled' : 'star'} 
+                        className={i < Math.floor(product.rating || 0) ? 'star filled' : 'star'} 
                       />
                     ))}
-                    <span className="rating-text">({product.numOfReviews || 0})</span>
+                    <span className="rating-text">({product.reviews || 0})</span>
                   </div>
                   <p className="product-price">{formatPrice(product.price)}</p>
                   {product.discount > 0 && (
@@ -164,7 +176,11 @@ const Products = () => {
                     >
                       Add to Cart
                     </button>
-                    <button className="wishlist-btn">
+                    <button 
+                      className={`wishlist-btn ${wishlist.includes(product.id) ? 'active' : ''}`}
+                      onClick={() => toggleWishlist(product.id)}
+                      title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                    >
                       <FaHeart />
                     </button>
                   </div>

@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShare, FaTruck, FaShieldAlt, FaUndo } from 'react-icons/fa';
 import { products } from '../data/products';
 import { formatPrice } from '../utils/priceFormatter';
+import { useCart } from '../context/CartContext';
 
-const ProductDetail = ({ addToCart }) => {
+const ProductDetail = () => {
   const { id } = useParams();
+  const { addToCart } = useCart();
+  const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [wishlist, setWishlist] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
   
-  const product = products.find(p => p.id === parseInt(id));
+  useEffect(() => {
+    const foundProduct = products.find(p => p.id === parseInt(id));
+    setProduct(foundProduct);
+    // Initialize wishlist with product if it's in stock
+    if (foundProduct && foundProduct.inStock) {
+      setWishlist(prev => [...prev, foundProduct.id]);
+    }
+  }, [id]);
   
   if (!product) {
     return (
@@ -40,6 +51,16 @@ const ProductDetail = ({ addToCart }) => {
     if (newQuantity >= 1 && newQuantity <= 10) {
       setQuantity(newQuantity);
     }
+  };
+
+  const toggleWishlist = (productId) => {
+    setWishlist(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
   };
 
   return (
@@ -137,7 +158,10 @@ const ProductDetail = ({ addToCart }) => {
                 >
                   Add to Cart
                 </button>
-                <button className="wishlist-btn large">
+                <button 
+                  className={`wishlist-btn large ${wishlist.includes(product.id) ? 'active' : ''}`}
+                  onClick={() => toggleWishlist(product.id)}
+                >
                   <FaHeart />
                 </button>
                 <button className="share-btn large">
@@ -152,7 +176,7 @@ const ProductDetail = ({ addToCart }) => {
                 <FaTruck />
                 <div>
                   <h4>Free Shipping</h4>
-                  <p>On orders over $50</p>
+                  <p>On orders over ₹4,000</p>
                 </div>
               </div>
               <div className="feature">
@@ -189,8 +213,21 @@ const ProductDetail = ({ addToCart }) => {
                     <Link to={`/product/${relatedProduct.id}`}>
                       <h3 className="product-title">{relatedProduct.name}</h3>
                     </Link>
-                    <p className="product-price">{formatPrice(relatedProduct.price)}</p>
-                    <button className="add-to-cart-btn" onClick={() => addToCart(relatedProduct.id)}>Add to Cart</button>
+                                        <p className="product-price">{formatPrice(relatedProduct.price)}</p>
+                    <div className="product-actions">
+                      <button 
+                        className="add-to-cart-btn" 
+                        onClick={() => addToCart(relatedProduct)}
+                      >
+                        Add to Cart
+                      </button>
+                      <button 
+                        className={`wishlist-btn ${wishlist.includes(relatedProduct.id) ? 'active' : ''}`}
+                        onClick={() => toggleWishlist(relatedProduct.id)}
+                      >
+                        <FaHeart />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

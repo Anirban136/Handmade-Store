@@ -568,6 +568,15 @@ body {
   color: white;
 }
 
+.wishlist-btn.active {
+  background: #8B4513;
+  color: white;
+}
+
+.wishlist-btn.active:hover {
+  background: #6B3410;
+}
+
 /* Filters Section */
 .filters-section {
   display: flex;
