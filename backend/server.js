@@ -163,9 +163,13 @@ app.post('/api/auth/register', (req, res) => {
   
   inMemoryDB.users.push(newUser);
   
+  // Generate a simple token (in real app, use JWT)
+  const token = `token_${newUser.id}_${Date.now()}`;
+  
   res.status(201).json({
     success: true,
     message: 'User registered successfully',
+    token: token,
     user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
   });
 });
@@ -190,9 +194,13 @@ app.post('/api/auth/login', (req, res) => {
   
   // In real app, verify password hash
   if (password === 'password123') { // Simple demo password
+    // Generate a simple token (in real app, use JWT)
+    const token = `token_${user.id}_${Date.now()}`;
+    
     res.json({
       success: true,
       message: 'Login successful',
+      token: token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role }
     });
   } else {

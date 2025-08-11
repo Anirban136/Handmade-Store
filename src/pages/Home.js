@@ -68,7 +68,7 @@ const Home = ({ addToCart }) => {
                 </div>
                 <p className="product-price">{formatPrice(product.price)}</p>
                 <p className="product-description">{product.description.substring(0, 100)}...</p>
-                <button className="add-to-cart-btn" onClick={() => addToCart(product.id)}>Add to Cart</button>
+                <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
               </div>
             </div>
           ))}
