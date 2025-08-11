@@ -1770,6 +1770,31 @@ body {
   .image-thumbnails {
     justify-content: center;
   }
+
+  /* Mobile-specific wishlist button fixes */
+  .wishlist-btn {
+    min-height: 44px; /* iOS minimum touch target */
+    min-width: 44px;
+    touch-action: manipulation; /* Optimize for touch */
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+    position: relative;
+    z-index: 10; /* Ensure button is above other elements */
+  }
+
+  .wishlist-btn:active {
+    transform: scale(0.95); /* Visual feedback on touch */
+  }
+
+  /* Ensure product actions are properly spaced on mobile */
+  .product-actions {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* Make sure buttons don't overlap on small screens */
+  .product-card .product-actions {
+    justify-content: space-between;
+  }
 }
 
 /* Cart Page Styles */

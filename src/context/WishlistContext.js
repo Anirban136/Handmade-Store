@@ -48,34 +48,24 @@ export const WishlistProvider = ({ children }) => {
 
   // Toggle wishlist item
   const toggleWishlist = (product) => {
-    console.log('=== WISHLIST TOGGLE DEBUG ===');
-    console.log('Product to toggle:', product);
-    console.log('Current wishlist before toggle:', wishlist);
-    
     setWishlist(prev => {
       const existingItemIndex = prev.findIndex(item => String(item.id) === String(product.id));
-      console.log('Existing item index:', existingItemIndex);
       
       if (existingItemIndex !== -1) {
         // Remove item if it exists
         const newWishlist = [...prev];
         newWishlist.splice(existingItemIndex, 1);
-        console.log('Removing item, new wishlist:', newWishlist);
         return newWishlist;
       } else {
         // Add item if it doesn't exist
-        const newWishlist = [...prev, product];
-        console.log('Adding item, new wishlist:', newWishlist);
-        return newWishlist;
+        return [...prev, product];
       }
     });
   };
 
   // Check if item is in wishlist
   const isInWishlist = (productId) => {
-    const result = wishlist.some(item => String(item.id) === String(productId));
-    console.log(`isInWishlist(${productId}): ${result}, current wishlist:`, wishlist.map(item => item.id));
-    return result;
+    return wishlist.some(item => String(item.id) === String(productId));
   };
 
   // Get wishlist count

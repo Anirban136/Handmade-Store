@@ -168,7 +168,15 @@ const Products = () => {
                     </button>
                     <button 
                       className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
-                      onClick={() => toggleWishlist(product)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleWishlist(product);
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
                       title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                     >
                       <FaHeart />

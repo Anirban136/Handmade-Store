@@ -149,7 +149,15 @@ const ProductDetail = () => {
                 </button>
                 <button 
                   className={`wishlist-btn large ${isInWishlist(product.id) ? 'active' : ''}`}
-                  onClick={() => toggleWishlist(product)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleWishlist(product);
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                 >
                   <FaHeart />
                 </button>
@@ -212,7 +220,15 @@ const ProductDetail = () => {
                       </button>
                                            <button 
                        className={`wishlist-btn ${isInWishlist(relatedProduct.id) ? 'active' : ''}`}
-                       onClick={() => toggleWishlist(relatedProduct)}
+                       onClick={(e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                         toggleWishlist(relatedProduct);
+                       }}
+                       onTouchStart={(e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                       }}
                      >
                        <FaHeart />
                      </button>
