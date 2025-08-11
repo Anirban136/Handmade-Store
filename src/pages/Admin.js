@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaStar, FaEye, FaUsers, FaBox, FaShoppingCart, FaChartBar, FaTimes, FaUpload, FaImage } from 'react-icons/fa';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import './Admin.css';
 
 const API_BASE_URL = 'https://handycurv-backend.onrender.com/api/admin';
 
 const Admin = () => {
-  const { user, isAdmin } = useContext(AuthContext);
+  const { user, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
