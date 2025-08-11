@@ -1,8 +1,45 @@
 const express = require('express');
 const router = express.Router();
-const fileStorage = require('../utils/fileStorage');
+const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { fileStorage } = require('../utils/fileStorage');
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/products');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = /jpeg|jpg|png|webp|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
 
 // In-memory data storage (shared with server.js)
 const inMemoryDB = {
@@ -100,7 +137,7 @@ router.get('/products', (req, res) => {
 // Add new product
 router.post('/products', (req, res) => {
   try {
-    const { name, description, price, category, stock, isActive, featured } = req.body;
+    const { name, description, price, category, stock, isActive, featured, images } = req.body;
     
     if (!name || !description || !price || !category) {
       return res.status(400).json({
@@ -115,7 +152,7 @@ router.post('/products', (req, res) => {
       description,
       price: parseInt(price),
       category,
-      images: [{ url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop' }], // Default image
+      images: images && images.length > 0 ? images.map(url => ({ url })) : [{ url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop' }],
       stock: parseInt(stock) || 0,
       isActive: isActive !== undefined ? isActive : true,
       featured: featured || false,
@@ -170,6 +207,11 @@ router.put('/products/:id', (req, res) => {
     // Ensure price and stock are numbers
     if (updates.price) updatedProduct.price = parseInt(updates.price);
     if (updates.stock) updatedProduct.stock = parseInt(updates.stock);
+    
+    // Handle images array properly
+    if (updates.images) {
+      updatedProduct.images = updates.images.map(url => ({ url }));
+    }
 
     inMemoryDB.products[productIndex] = updatedProduct;
     
@@ -266,6 +308,215 @@ router.patch('/products/:id/featured', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating product'
+    });
+  }
+});
+
+// Manage product images
+router.patch('/products/:id/images', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { images } = req.body;
+    
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    if (!images || !Array.isArray(images)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Images array is required'
+      });
+    }
+
+    product.images = images.map(url => ({ url }));
+    product.updatedAt = new Date().toISOString();
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: 'Product images updated successfully',
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save changes'
+      });
+    }
+  } catch (error) {
+    console.error('Error updating product images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating product images'
+    });
+  }
+});
+
+// Upload product image
+router.post('/products/:id/upload-image', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded.'
+      });
+    }
+
+    const newImageUrl = `/uploads/products/${req.file.filename}`;
+    product.images.push({ url: newImageUrl });
+    product.updatedAt = new Date().toISOString();
+
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: 'Image uploaded successfully',
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading image'
+    });
+  }
+});
+
+// Delete product image
+router.delete('/products/:id/images/:imageIndex', (req, res) => {
+  try {
+    const { id, imageIndex } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (imageIndex < 0 || imageIndex >= product.images.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image index'
+      });
+    }
+    
+    const deletedImage = product.images.splice(imageIndex, 1)[0];
+    product.updatedAt = new Date().toISOString();
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: 'Image deleted successfully',
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting image'
+    });
+  }
+});
+
+// Bulk upload images for a product
+router.post('/products/:id/upload-images', upload.array('images', 10), (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded.'
+      });
+    }
+    
+    const newImages = req.files.map(file => ({
+      url: `/uploads/products/${file.filename}`
+    }));
+    
+    product.images.push(...newImages);
+    product.updatedAt = new Date().toISOString();
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: `${newImages.length} images uploaded successfully`,
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading images'
+    });
+  }
+});
+
+// Get all uploaded images for a product
+router.get('/products/:id/images', (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      images: product.images || []
+    });
+  } catch (error) {
+    console.error('Error getting product images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving product images'
     });
   }
 });

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { FaPlus, FaEdit, FaTrash, FaStar, FaEye, FaUsers, FaBox, FaShoppingCart, FaChartBar } from 'react-icons/fa';
+import React, { useState, useEffect, useContext } from 'react';
+import { FaPlus, FaEdit, FaTrash, FaStar, FaEye, FaUsers, FaBox, FaShoppingCart, FaChartBar, FaTimes, FaUpload, FaImage } from 'react-icons/fa';
+import { AuthContext } from '../context/AuthContext';
 import './Admin.css';
 
+const API_BASE_URL = 'https://handycurv-backend.onrender.com/api/admin';
+
 const Admin = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
@@ -23,8 +25,14 @@ const Admin = () => {
     category: '',
     stock: '',
     isActive: true,
-    featured: false
+    featured: false,
+    images: []
   });
+  const [imageUrls, setImageUrls] = useState([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -41,10 +49,10 @@ const Admin = () => {
       
       // Fetch all data in parallel
       const [productsRes, usersRes, ordersRes, statsRes] = await Promise.all([
-        fetch('https://handycurv-backend.onrender.com/api/admin/products'),
-        fetch('https://handycurv-backend.onrender.com/api/admin/users'),
-        fetch('https://handycurv-backend.onrender.com/api/admin/orders'),
-        fetch('https://handycurv-backend.onrender.com/api/admin/stats')
+        fetch(`${API_BASE_URL}/products`),
+        fetch(`${API_BASE_URL}/users`),
+        fetch(`${API_BASE_URL}/orders`),
+        fetch(`${API_BASE_URL}/stats`)
       ]);
 
       if (productsRes.ok) {
@@ -77,37 +85,135 @@ const Admin = () => {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
+    // setIsLoading(true); // This line was removed from the original file, so it's removed here.
     
     try {
-      const url = editingProduct 
-        ? `https://handycurv-backend.onrender.com/api/admin/products/${editingProduct.id}`
-        : 'https://handycurv-backend.onrender.com/api/admin/products';
+      const productData = {
+        ...productForm,
+        images: [...imageUrls, ...uploadedFiles.map(file => ({ url: file.url }))]
+      };
       
-      const method = editingProduct ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(productForm)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(editingProduct ? 'Product updated successfully!' : 'Product created successfully!');
-        setShowProductForm(false);
-        setEditingProduct(null);
-        resetProductForm();
-        fetchData(); // Refresh data
+      if (editingProduct) {
+        // Update existing product
+        const response = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData)
+        });
+        
+        if (response.ok) {
+          setShowProductForm(false);
+          setEditingProduct(null);
+          fetchData();
+          alert('Product updated successfully!');
+        } else {
+          const error = await response.json();
+          alert(`Error: ${error.message}`);
+        }
       } else {
-        const error = await response.json();
-        alert(`Error: ${error.message}`);
+        // Create new product
+        const response = await fetch(`${API_BASE_URL}/products`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData)
+        });
+        
+        if (response.ok) {
+          setShowProductForm(false);
+          fetchData();
+          alert('Product created successfully!');
+        } else {
+          const error = await response.json();
+          alert(`Error: ${error.message}`);
+        }
       }
     } catch (error) {
-      console.error('Error saving product:', error);
-      alert('Failed to save product');
+      console.error('Error:', error);
+      alert('An error occurred. Please try again.');
+    } finally {
+      // setIsLoading(false); // This line was removed from the original file, so it's removed here.
     }
+  };
+
+  // File upload functions
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFiles(e.target.files);
+    }
+  };
+
+  const handleFiles = (files) => {
+    const newFiles = Array.from(files).map(file => ({
+      file,
+      id: Date.now() + Math.random(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      preview: URL.createObjectURL(file)
+    }));
+    
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const uploadFiles = async (productId) => {
+    if (uploadedFiles.length === 0) return;
+    
+    setIsUploading(true);
+    const formData = new FormData();
+    
+    uploadedFiles.forEach((fileObj, index) => {
+      formData.append('images', fileObj.file);
+    });
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/products/${productId}/upload-images`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        // Update the product with new images
+        setProductForm(prev => ({
+          ...prev,
+          images: [...prev.images, ...result.product.images.slice(-uploadedFiles.length)]
+        }));
+        setUploadedFiles([]);
+        alert('Images uploaded successfully!');
+      } else {
+        const error = await response.json();
+        alert(`Upload failed: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeUploadedFile = (fileId) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
   const handleEditProduct = (product) => {
@@ -119,7 +225,8 @@ const Admin = () => {
       category: product.category,
       stock: product.stock.toString(),
       isActive: product.isActive,
-      featured: product.featured
+      featured: product.featured,
+      images: product.images || [] // Assuming product.images is an array of URLs
     });
     setShowProductForm(true);
   };
@@ -130,7 +237,7 @@ const Admin = () => {
     }
 
     try {
-      const response = await fetch(`https://handycurv-backend.onrender.com/api/admin/products/${productId}`, {
+      const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
         method: 'DELETE'
       });
 
@@ -149,7 +256,7 @@ const Admin = () => {
 
   const toggleFeatured = async (productId, currentFeatured) => {
     try {
-      const response = await fetch(`https://handycurv-backend.onrender.com/api/admin/products/${productId}/featured`, {
+      const response = await fetch(`${API_BASE_URL}/products/${productId}/featured`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -176,8 +283,12 @@ const Admin = () => {
       category: '',
       stock: '',
       isActive: true,
-      featured: false
+      featured: false,
+      images: []
     });
+    setImageUrls([]); // Clear image URLs
+    setNewImageUrl(''); // Clear new image URL
+    setUploadedFiles([]); // Clear uploaded files
   };
 
   const handleInputChange = (e) => {
@@ -413,6 +524,169 @@ const Admin = () => {
                       </label>
                     </div>
                   </div>
+
+                  {/* Image Upload Section */}
+                  <div className="form-group">
+                    <label>Product Images</label>
+                    <div className="image-upload-container">
+                      <div className="image-upload-instructions">
+                        <p><strong>📸 Image Upload Options:</strong></p>
+                        <ul>
+                          <li><strong>Option 1:</strong> Upload files directly (drag & drop or click to select)</li>
+                          <li><strong>Option 2:</strong> Add image URLs from external sources</li>
+                          <li>Supported formats: JPG, PNG, WebP, GIF (max 5MB each)</li>
+                          <li>First image will be the main product image</li>
+                          <li>You can add multiple images for different angles</li>
+                        </ul>
+                      </div>
+                      
+                      {/* File Upload Section */}
+                      <div className="file-upload-section">
+                        <h4>📁 Upload Files:</h4>
+                        <div 
+                          className={`drag-drop-zone ${dragActive ? 'drag-active' : ''}`}
+                          onDragEnter={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDragOver={handleDrag}
+                          onDrop={handleDrop}
+                        >
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                            className="file-input"
+                            id="file-upload"
+                          />
+                          <label htmlFor="file-upload" className="file-input-label">
+                            <FaUpload className="upload-icon" />
+                            <span>Drag & drop images here or click to select</span>
+                            <small>Max 10 images, 5MB each</small>
+                          </label>
+                        </div>
+                        
+                        {/* Uploaded Files Preview */}
+                        {uploadedFiles.length > 0 && (
+                          <div className="uploaded-files">
+                            <h5>Selected Files ({uploadedFiles.length}):</h5>
+                            <div className="file-preview-grid">
+                              {uploadedFiles.map((fileObj) => (
+                                <div key={fileObj.id} className="file-preview-item">
+                                  <img src={fileObj.preview} alt={fileObj.name} />
+                                  <div className="file-info">
+                                    <span className="file-name">{fileObj.name}</span>
+                                    <span className="file-size">{(fileObj.size / 1024 / 1024).toFixed(2)} MB</span>
+                                  </div>
+                                  <button 
+                                    className="remove-file-btn"
+                                    onClick={() => removeUploadedFile(fileObj.id)}
+                                    title="Remove file"
+                                  >
+                                    <FaTimes />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button 
+                              type="button" 
+                              className="upload-files-btn"
+                              onClick={() => uploadFiles(editingProduct?.id || 'new')}
+                              disabled={isUploading}
+                            >
+                              {isUploading ? 'Uploading...' : <><FaUpload /> Upload Files</>}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* URL Input Section */}
+                      <div className="url-input-section">
+                        <h4>🔗 Add Image URLs:</h4>
+                        {imageUrls.length > 0 && (
+                          <div className="existing-images">
+                            <h5>Current URLs ({imageUrls.length}):</h5>
+                            {imageUrls.map((url, index) => (
+                              <div key={index} className="existing-image-item">
+                                <img src={url} alt={`Product ${productForm.name}`} />
+                                <div className="image-order-badge">{index + 1}</div>
+                                <button 
+                                  className="remove-image-btn"
+                                  onClick={() => {
+                                    const newImageUrls = imageUrls.filter((_, i) => i !== index);
+                                    setImageUrls(newImageUrls);
+                                    setProductForm(prev => ({
+                                      ...prev,
+                                      images: newImageUrls
+                                    }));
+                                  }}
+                                  title="Remove image"
+                                >
+                                  <FaTrash />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="add-image-section">
+                          <input
+                            type="url"
+                            name="newImageUrl"
+                            value={newImageUrl}
+                            onChange={(e) => setNewImageUrl(e.target.value)}
+                            placeholder="Enter image URL (e.g., https://example.com/image.jpg)"
+                            className="image-url-input"
+                          />
+                          <button 
+                            type="button" 
+                            className="add-image-btn"
+                            onClick={() => {
+                              if (newImageUrl) {
+                                setImageUrls(prev => [...prev, newImageUrl]);
+                                setProductForm(prev => ({
+                                  ...prev,
+                                  images: [...prev.images, newImageUrl]
+                                }));
+                                setNewImageUrl('');
+                              }
+                            }}
+                            disabled={!newImageUrl}
+                          >
+                            <FaPlus /> Add URL
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Combined Images Display */}
+                      {(imageUrls.length > 0 || uploadedFiles.length > 0) && (
+                        <div className="combined-images">
+                          <h4>📋 All Product Images:</h4>
+                          <div className="combined-images-grid">
+                            {imageUrls.map((url, index) => (
+                              <div key={`url-${index}`} className="combined-image-item">
+                                <img src={url} alt={`Product ${productForm.name}`} />
+                                <div className="image-order-badge">{index + 1}</div>
+                                <span className="image-source">URL</span>
+                              </div>
+                            ))}
+                            {uploadedFiles.map((fileObj, index) => (
+                              <div key={`file-${fileObj.id}`} className="combined-image-item">
+                                <img src={fileObj.preview} alt={fileObj.name} />
+                                <div className="image-order-badge">{imageUrls.length + index + 1}</div>
+                                <span className="image-source">File</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {(imageUrls.length === 0 && uploadedFiles.length === 0) && (
+                        <div className="no-images-warning">
+                          <p>⚠️ At least one image is required for the product</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   
                   <div className="form-actions">
                     <button type="submit" className="save-btn">
@@ -453,11 +727,26 @@ const Admin = () => {
                 {products.map(product => (
                   <tr key={product.id}>
                     <td>
-                      <img 
-                        src={product.images?.[0]?.url || 'https://via.placeholder.com/50'} 
-                        alt={product.name}
-                        className="product-thumbnail"
-                      />
+                      <div className="product-images-preview">
+                        {product.images && product.images.length > 0 ? (
+                          product.images.slice(0, 3).map((image, index) => (
+                            <img 
+                              key={index}
+                              src={image.url} 
+                              alt={`${product.name} ${index + 1}`}
+                              className="product-thumbnail"
+                              title={`${product.name} - Image ${index + 1}`}
+                            />
+                          ))
+                        ) : (
+                          <div className="no-image-placeholder">No Image</div>
+                        )}
+                        {product.images && product.images.length > 3 && (
+                          <div className="more-images-indicator">
+                            +{product.images.length - 3} more
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td>{product.name}</td>
                     <td>{product.category}</td>

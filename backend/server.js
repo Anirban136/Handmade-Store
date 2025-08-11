@@ -14,31 +14,26 @@ const adminRoutes = require('./routes/admin');
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        'https://handycurv.vercel.app',
-        'https://handmade-store-anirban136.vercel.app',
-        'https://handmade-store-git-main-anirban136.vercel.app',
-        'https://handmade-store-anirban136.vercel.app',
-        /^https:\/\/.*\.vercel\.app$/, // Allow any Vercel subdomain
-        process.env.FRONTEND_URL
-      ].filter(Boolean)
-    : 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: [
+    'https://handycurv.vercel.app',
+    'https://handycurv-frontend.vercel.app',
+    /^https:\/\/.*\.vercel\.app$/,
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// CORS debugging middleware
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Debug CORS
 app.use((req, res, next) => {
-  console.log(`🌐 ${req.method} ${req.path} - Origin: ${req.headers.origin}`);
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin}`);
   next();
 });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // In-memory data storage
 const inMemoryDB = {
