@@ -11,10 +11,25 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://handycurv.vercel.app']
+    ? [
+        'https://handycurv.vercel.app',
+        'https://handmade-store-anirban136.vercel.app',
+        'https://handmade-store-git-main-anirban136.vercel.app',
+        'https://handmade-store-anirban136.vercel.app',
+        /^https:\/\/.*\.vercel\.app$/, // Allow any Vercel subdomain
+        process.env.FRONTEND_URL
+      ].filter(Boolean)
     : 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// CORS debugging middleware
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.path} - Origin: ${req.headers.origin}`);
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
