@@ -8,6 +8,9 @@ dotenv.config();
 
 const app = express();
 
+// Import routes
+const authRoutes = require('./routes/auth');
+
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -38,15 +41,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // In-memory data storage
 const inMemoryDB = {
-  users: [
-    {
-      id: '1',
-      name: 'Admin User',
-      email: 'admin@handycurv.com',
-      password: '$2a$10$example_hash', // In real app, this would be hashed
-      role: 'admin'
-    }
-  ],
   products: [
     {
       id: '1',
@@ -134,103 +128,8 @@ app.get('/api/products/:id', (req, res) => {
   }
 });
 
-// User authentication endpoints
-app.post('/api/auth/register', (req, res) => {
-  const { name, email, password } = req.body;
-  
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Please provide name, email and password'
-    });
-  }
-  
-  const existingUser = inMemoryDB.users.find(u => u.email === email);
-  if (existingUser) {
-    return res.status(400).json({
-      success: false,
-      message: 'User already exists'
-    });
-  }
-  
-  const newUser = {
-    id: Date.now().toString(),
-    name,
-    email,
-    password: '$2a$10$example_hash', // In real app, hash the password
-    role: 'user'
-  };
-  
-  inMemoryDB.users.push(newUser);
-  
-  // Generate a simple token (in real app, use JWT)
-  const token = `token_${newUser.id}_${Date.now()}`;
-  
-  res.status(201).json({
-    success: true,
-    message: 'User registered successfully',
-    token: token,
-    user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
-  });
-});
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Please provide email and password'
-    });
-  }
-  
-  const user = inMemoryDB.users.find(u => u.email === email);
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid credentials'
-    });
-  }
-  
-  // In real app, verify password hash
-  if (password === 'password123') { // Simple demo password
-    // Generate a simple token (in real app, use JWT)
-    const token = `token_${user.id}_${Date.now()}`;
-    
-    res.json({
-      success: true,
-      message: 'Login successful',
-      token: token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
-    });
-  } else {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid credentials'
-    });
-  }
-});
-
-// User profile route
-app.get('/api/auth/me', (req, res) => {
-  res.json({
-    success: true,
-    user: {
-      id: '1',
-      name: 'Admin User',
-      email: 'admin@handycurv.com',
-      role: 'admin'
-    }
-  });
-});
-
-// Logout route
-app.get('/api/auth/logout', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
-});
+// Use auth routes
+app.use('/api/auth', authRoutes);
 
 // Cart and Order endpoints
 app.post('/api/orders/new', (req, res) => {
