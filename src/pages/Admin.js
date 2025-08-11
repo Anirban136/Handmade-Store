@@ -33,7 +33,6 @@ const Admin = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [showImageSettings, setShowImageSettings] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -95,8 +94,11 @@ const Admin = () => {
         images: [] // Start with empty images array
       };
       
+      console.log('Submitting product data:', productData);
+      
       if (editingProduct) {
         // Update existing product
+        console.log('Updating existing product:', editingProduct.id);
         const response = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -119,15 +121,18 @@ const Admin = () => {
         }
       } else {
         // Create new product first
+        console.log('Creating new product...');
         const response = await fetch(`${API_BASE_URL}/products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(productData)
         });
         
+        console.log('Create product response status:', response.status);
+        
         if (response.ok) {
           const result = await response.json();
-          console.log('Product created:', result);
+          console.log('Product creation result:', result);
           
           if (result.product && result.product.id) {
             const newProductId = result.product.id;
@@ -136,22 +141,61 @@ const Admin = () => {
             // If there are uploaded files, upload them to the new product
             if (uploadedFiles.length > 0) {
               console.log('Uploading images to product:', newProductId);
-              await uploadFiles(newProductId);
+              try {
+                await uploadFiles(newProductId);
+              } catch (uploadError) {
+                console.error('Image upload failed:', uploadError);
+                alert('Product created but image upload failed. You can add images later.');
+              }
             }
             
             setShowProductForm(false);
             fetchData();
             alert('Product created successfully!');
           } else {
-            throw new Error('Product created but no ID returned');
+            console.error('Product created but no ID returned:', result);
+            // Try to find the product by name as a fallback
+            console.log('Attempting to find product by name...');
+            const searchResponse = await fetch(`${API_BASE_URL}/products?search=${encodeURIComponent(productData.name)}`);
+            if (searchResponse.ok) {
+              const searchResult = await searchResponse.json();
+              if (searchResult.products && searchResult.products.length > 0) {
+                const foundProduct = searchResult.products[0];
+                console.log('Found product by name:', foundProduct);
+                
+                // Try to upload images to the found product
+                if (uploadedFiles.length > 0) {
+                  try {
+                    await uploadFiles(foundProduct.id);
+                  } catch (uploadError) {
+                    console.error('Image upload failed:', uploadError);
+                    alert('Product created but image upload failed. You can add images later.');
+                  }
+                }
+                
+                setShowProductForm(false);
+                fetchData();
+                alert('Product created successfully!');
+                return;
+              }
+            }
+            throw new Error('Product created but no ID returned and could not find product');
           }
         } else {
-          const error = await response.json();
-          alert(`Error: ${error.message}`);
+          const errorText = await response.text();
+          console.error('Product creation failed:', response.status, errorText);
+          let errorMessage = 'Failed to create product';
+          try {
+            const error = JSON.parse(errorText);
+            errorMessage = error.message || errorMessage;
+          } catch (e) {
+            errorMessage = `Failed to create product (Status: ${response.status})`;
+          }
+          alert(`Error: ${errorMessage}`);
         }
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error in handleProductSubmit:', error);
       alert(`An error occurred: ${error.message}`);
     } finally {
       setLoading(false);
@@ -590,31 +634,6 @@ const Admin = () => {
                       {/* File Upload Section */}
                       <div className="file-upload-section">
                         <h4>📁 Upload Files:</h4>
-                        
-                        {/* Image Settings */}
-                        <div className="image-settings">
-                          <button 
-                            type="button" 
-                            className="image-settings-toggle-btn"
-                            onClick={() => setShowImageSettings(!showImageSettings)}
-                          >
-                            <FaImage /> Image Settings {showImageSettings ? '▼' : '▶'}
-                          </button>
-                          
-                          {showImageSettings && (
-                            <div className="image-settings-options">
-                              <div className="image-info">
-                                <p><strong>💡 Upload Features:</strong></p>
-                                <ul>
-                                  <li>🔄 Direct file upload to server</li>
-                                  <li>📐 Original image dimensions preserved</li>
-                                  <li>🎯 High quality image storage</li>
-                                  <li>🧹 Automatic file management</li>
-                                </ul>
-                              </div>
-                            </div>
-                          )}
-                        </div>
                         
                         <div 
                           className={`drag-drop-zone ${dragActive ? 'drag-active' : ''}`}
