@@ -1,15 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShippingFast, FaShieldAlt, FaHandshake } from 'react-icons/fa';
-import { products } from '../data/products';
+import { useProducts } from '../context/ProductContext';
 import { formatPrice } from '../utils/priceFormatter';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
 const Home = () => {
+  const { products, loading, fetchProducts } = useProducts();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
-  const featuredProducts = products.slice(0, 4);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+
+  // Fetch products and set featured products
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        await fetchProducts();
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      }
+    };
+    
+    loadProducts();
+  }, [fetchProducts]);
+
+  // Update featured products when products change
+  useEffect(() => {
+    if (products && products.length > 0) {
+      // Get featured products (first 4 products, or filter by featured flag if available)
+      const featured = products.filter(product => product.featured).slice(0, 4);
+      // If no featured products, use first 4 products
+      if (featured.length === 0) {
+        setFeaturedProducts(products.slice(0, 4));
+      } else {
+        setFeaturedProducts(featured);
+      }
+    }
+  }, [products]);
 
   return (
     <div className="home">
@@ -55,54 +83,64 @@ const Home = () => {
       {/* Featured Products */}
       <section className="products-section">
         <h2 className="section-title">Featured Products</h2>
-        <div className="products-grid">
-          {featuredProducts.map((product) => (
-            <div key={product.id} className="product-card">
-              <Link to={`/product/${product.id}`}>
-                <img src={product.image} alt={product.name} className="product-image" />
-              </Link>
-              <div className="product-info">
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading products...</p>
+          </div>
+        ) : featuredProducts.length > 0 ? (
+          <div className="products-grid">
+            {featuredProducts.map((product) => (
+              <div key={product.id} className="product-card">
                 <Link to={`/product/${product.id}`}>
-                  <h3 className="product-title">{product.name}</h3>
+                  <img 
+                    src={product.images && product.images.length > 0 ? product.images[0].url : 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'} 
+                    alt={product.name} 
+                    className="product-image" 
+                  />
                 </Link>
-                <div className="product-rating">
-                  {[...Array(5)].map((_, i) => (
-                    <FaStar 
-                      key={i} 
-                      className={i < Math.floor(product.rating) ? 'star filled' : 'star'} 
-                    />
-                  ))}
-                  <span className="rating-text">({product.reviews})</span>
-                </div>
-                <p className="product-price">{formatPrice(product.price)}</p>
-                <p className="product-description">{product.description.substring(0, 100)}...</p>
-                <div className="product-actions">
-                  <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
-                  <button 
-                    className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleWishlist(product);
-                    }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                  >
-                    <FaHeart />
-                  </button>
+                <div className="product-info">
+                  <Link to={`/product/${product.id}`}>
+                    <h3 className="product-title">{product.name}</h3>
+                  </Link>
+                  <div className="product-rating">
+                    {[...Array(5)].map((_, i) => (
+                      <FaStar 
+                        key={i} 
+                        className={i < Math.floor(product.rating) ? 'star filled' : 'star'} 
+                      />
+                    ))}
+                    <span className="rating-text">({product.reviews})</span>
+                  </div>
+                  <p className="product-price">{formatPrice(product.price)}</p>
+                  <p className="product-description">{product.description.substring(0, 100)}...</p>
+                  <div className="product-actions">
+                    <button className="add-to-cart-btn" onClick={() => addToCart(product)}>Add to Cart</button>
+                    <button 
+                      className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleWishlist(product);
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                    >
+                      <FaHeart />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className="text-center" style={{ marginTop: '3rem' }}>
-          <Link to="/products" className="cta-button">
-            View All Products
-          </Link>
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="no-products">
+            <p>No products available at the moment.</p>
+          </div>
+        )}
       </section>
 
       {/* About Section */}

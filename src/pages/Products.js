@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaSearch, FaHeart, FaSpinner } from 'react-icons/fa';
 import { useProducts } from '../context/ProductContext';
@@ -7,7 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { formatPrice } from '../utils/priceFormatter';
 
 const Products = () => {
-  const { products, loading, error, filters, searchProducts, filterByCategory, clearFilters } = useProducts();
+  const { products, loading, error, filters, fetchProducts, searchProducts, filterByCategory, clearFilters } = useProducts();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,6 +15,12 @@ const Products = () => {
 
   // Categories from backend
   const categories = ['All', 'Pottery', 'Textiles', 'Jewelry', 'Kitchen', 'Art', 'Stationery', 'Home Decor'];
+
+  // Fetch products when component mounts
+  useEffect(() => {
+    console.log('Products page loading, fetching products...');
+    fetchProducts();
+  }, [fetchProducts]);
 
   // Handle search
   const handleSearch = (e) => {
@@ -136,7 +142,7 @@ const Products = () => {
               <div key={product.id} className="product-card">
                 <Link to={`/product/${product.id}`}>
                   <img 
-                    src={product.image} 
+                    src={product.images && product.images.length > 0 ? product.images[0].url : 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'} 
                     alt={product.name} 
                     className="product-image" 
                   />
