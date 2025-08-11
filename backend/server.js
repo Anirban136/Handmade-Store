@@ -11,7 +11,7 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-domain.vercel.app', 'https://handycurv.vercel.app']
+    ? [process.env.FRONTEND_URL || 'https://handycurv.vercel.app']
     : 'http://localhost:3000',
   credentials: true
 }));
