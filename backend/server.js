@@ -102,34 +102,52 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Products API endpoints
-app.get('/api/products', (req, res) => {
-  res.json({
-    success: true,
-    products: inMemoryDB.products
-  });
-});
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
-app.get('/api/products/:id', (req, res) => {
-  const product = inMemoryDB.products.find(p => p.id === req.params.id);
-  if (product) {
+// Public products endpoint
+app.get('/api/products', (req, res) => {
+  try {
     res.json({
       success: true,
-      product
+      products: inMemoryDB.products.filter(product => product.isActive),
+      total: inMemoryDB.products.filter(product => product.isActive).length
     });
-  } else {
-    res.status(404).json({
+  } catch (error) {
+    console.error('Error getting products:', error);
+    res.status(500).json({
       success: false,
-      message: 'Product not found'
+      message: 'Error retrieving products'
     });
   }
 });
 
-// Use auth routes
-app.use('/api/auth', authRoutes);
-
-// Use admin routes
-app.use('/api/admin', adminRoutes);
+// Get single product
+app.get('/api/products/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id && p.isActive);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product
+    });
+  } catch (error) {
+    console.error('Error getting product:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving product'
+    });
+  }
+});
 
 // Admin endpoint to view all users (for debugging)
 app.get('/api/admin/users', (req, res) => {

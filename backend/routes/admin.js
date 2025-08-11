@@ -684,6 +684,99 @@ router.get('/products/:id/images', (req, res) => {
   }
 });
 
+// Simple file upload without compression (fallback)
+router.post('/products/:id/upload-simple', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded.'
+      });
+    }
+
+    const newImageUrl = `/uploads/products/${req.file.filename}`;
+    product.images.push({ url: newImageUrl });
+    product.updatedAt = new Date().toISOString();
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: 'Image uploaded successfully',
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading image'
+    });
+  }
+});
+
+// Simple bulk upload without compression (fallback)
+router.post('/products/:id/upload-simple-bulk', upload.array('images', 10), (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = inMemoryDB.products.find(p => p.id === id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded.'
+      });
+    }
+    
+    const newImages = req.files.map(file => ({
+      url: `/uploads/products/${file.filename}`
+    }));
+    
+    product.images.push(...newImages);
+    product.updatedAt = new Date().toISOString();
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: `${newImages.length} images uploaded successfully`,
+        product
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading images'
+    });
+  }
+});
+
 // ===== USER MANAGEMENT =====
 
 // Get all users

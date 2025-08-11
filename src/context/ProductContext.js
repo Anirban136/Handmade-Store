@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { products as localProducts } from '../data/products';
 
 const ProductContext = createContext();
 
@@ -36,11 +35,19 @@ export const ProductProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      let filteredProducts = [...localProducts];
+      // Fetch products from backend API
+      const response = await fetch('https://handycurv-backend.onrender.com/api/products');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      
+      const data = await response.json();
+      let allProducts = data.products || [];
       
       // Apply keyword filter
       if (params.keyword) {
-        filteredProducts = filteredProducts.filter(product =>
+        allProducts = allProducts.filter(product =>
           product.name.toLowerCase().includes(params.keyword.toLowerCase()) ||
           product.description.toLowerCase().includes(params.keyword.toLowerCase())
         );
@@ -48,46 +55,55 @@ export const ProductProvider = ({ children }) => {
       
       // Apply category filter
       if (params.category && params.category !== 'All') {
-        filteredProducts = filteredProducts.filter(product =>
+        allProducts = allProducts.filter(product =>
           product.category === params.category
         );
       }
       
       // Apply price filters
       if (params.minPrice) {
-        filteredProducts = filteredProducts.filter(product =>
+        allProducts = allProducts.filter(product =>
           product.price >= parseInt(params.minPrice)
         );
       }
       
       if (params.maxPrice) {
-        filteredProducts = filteredProducts.filter(product =>
+        allProducts = allProducts.filter(product =>
           product.price <= parseInt(params.maxPrice)
         );
       }
       
       // Apply rating filter
       if (params.rating) {
-        filteredProducts = filteredProducts.filter(product =>
+        allProducts = allProducts.filter(product =>
           product.rating >= parseInt(params.rating)
         );
       }
       
-      setProducts(filteredProducts);
+      setProducts(allProducts);
       setPagination({
         currentPage: parseInt(params.page) || 1,
-        totalPages: Math.ceil(filteredProducts.length / 8),
-        totalProducts: filteredProducts.length,
+        totalPages: Math.ceil(allProducts.length / 8),
+        totalProducts: allProducts.length,
         productsPerPage: 8
       });
       
       return {
-        products: filteredProducts,
-        productsCount: filteredProducts.length,
+        products: allProducts,
+        productsCount: allProducts.length,
         resPerPage: 8
       };
     } catch (error) {
+      console.error('Error fetching products:', error);
       setError(error.message);
+      // Fallback to empty products if API fails
+      setProducts([]);
+      setPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalProducts: 0,
+        productsPerPage: 8
+      });
       throw error;
     } finally {
       setLoading(false);
@@ -99,11 +115,16 @@ export const ProductProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      const product = localProducts.find(p => p.id === parseInt(id));
-      if (!product) {
+      
+      // Fetch single product from backend API
+      const response = await fetch(`https://handycurv-backend.onrender.com/api/products/${id}`);
+      
+      if (!response.ok) {
         throw new Error('Product not found');
       }
-      return { product };
+      
+      const data = await response.json();
+      return { product: data.product };
     } catch (error) {
       setError(error.message);
       throw error;

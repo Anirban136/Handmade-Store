@@ -214,15 +214,34 @@ const Admin = () => {
     console.log('Compression settings:', { compressionQuality, customDimensions });
     
     try {
+      // Try compression upload first
       const uploadUrl = `${API_BASE_URL}/products/${productId}/upload-images`;
-      console.log('Uploading to:', uploadUrl);
+      console.log('Trying compression upload to:', uploadUrl);
       
-      const response = await fetch(uploadUrl, {
+      let response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData
       });
       
       console.log('Upload response status:', response.status);
+      
+      // If compression upload fails, try simple upload
+      if (response.status === 404 || response.status === 500) {
+        console.log('Compression upload failed, trying simple upload...');
+        
+        // Create new FormData for simple upload
+        const simpleFormData = new FormData();
+        uploadedFiles.forEach((fileObj, index) => {
+          simpleFormData.append('images', fileObj.file);
+        });
+        
+        response = await fetch(`${API_BASE_URL}/products/${productId}/upload-simple-bulk`, {
+          method: 'POST',
+          body: simpleFormData
+        });
+        
+        console.log('Simple upload response status:', response.status);
+      }
       
       if (response.ok) {
         const result = await response.json();
@@ -235,7 +254,7 @@ const Admin = () => {
         }));
         setUploadedFiles([]);
         
-        // Show compression results
+        // Show results
         if (result.compression) {
           const successCount = result.compression.successful;
           const totalCount = result.compression.totalImages;
@@ -245,12 +264,8 @@ const Admin = () => {
           
           alert(`Images uploaded successfully!\n\n📊 Compression Results:\n• ${successCount}/${totalCount} images compressed\n• Average compression: ${avgCompression.toFixed(1)}%\n• Format: WebP for better quality`);
         } else {
-          alert('Images uploaded successfully!');
+          alert('Images uploaded successfully! (Simple upload mode)');
         }
-      } else if (response.status === 404) {
-        // Backend doesn't have compression features yet, try basic upload
-        console.log('Compression endpoint not found, trying basic upload...');
-        await basicImageUpload(productId);
       } else {
         const errorText = await response.text();
         console.error('Upload failed with status:', response.status);
