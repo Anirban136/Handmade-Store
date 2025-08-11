@@ -79,7 +79,8 @@ const inMemoryDB = {
   orders: []
 };
 
-console.log('✅ Using in-memory storage with sample data');
+console.log('✅ Using in-memory storage for products and orders');
+console.log('✅ Using file storage for user authentication');
 
 // Root route
 app.get('/', (req, res) => {
@@ -130,6 +131,33 @@ app.get('/api/products/:id', (req, res) => {
 
 // Use auth routes
 app.use('/api/auth', authRoutes);
+
+// Admin endpoint to view all users (for debugging)
+app.get('/api/admin/users', (req, res) => {
+  const fileStorage = require('./utils/fileStorage');
+  try {
+    const users = fileStorage.getUsers().map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin
+    }));
+    
+    res.json({
+      success: true,
+      message: 'All users retrieved successfully',
+      users
+    });
+  } catch (error) {
+    console.error('Error getting users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving users'
+    });
+  }
+});
 
 // Cart and Order endpoints
 app.post('/api/orders/new', (req, res) => {

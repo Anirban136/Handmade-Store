@@ -1,19 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-
-// In-memory data storage (shared with server.js)
-const inMemoryDB = {
-  users: [
-    {
-      id: '1',
-      name: 'Admin User',
-      email: 'admin@handycurv.com',
-      password: '$2a$10$example_hash', // In real app, this would be hashed
-      role: 'admin'
-    }
-  ]
-};
+const fileStorage = require('../utils/fileStorage');
 
 // Register user => /api/auth/register
 router.post('/register', async (req, res) => {
@@ -21,7 +9,7 @@ router.post('/register', async (req, res) => {
     const { name, email, password, phone, address } = req.body;
 
     // Check if user already exists
-    const existingUser = inMemoryDB.users.find(u => u.email === email);
+    const existingUser = fileStorage.getUserByEmail(email);
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -30,17 +18,21 @@ router.post('/register', async (req, res) => {
     }
 
     // Create user
-    const newUser = {
-      id: Date.now().toString(),
+    const newUser = fileStorage.addUser({
       name,
       email,
       password: '$2a$10$example_hash', // In real app, hash the password
       role: 'user',
       phone: phone || '',
       address: address || {}
-    };
+    });
 
-    inMemoryDB.users.push(newUser);
+    if (!newUser) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create user'
+      });
+    }
 
     // Generate a simple token (in real app, use JWT)
     const token = `token_${newUser.id}_${Date.now()}`;
@@ -79,7 +71,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Finding user in database
-    const user = inMemoryDB.users.find(u => u.email === email);
+    const user = fileStorage.getUserByEmail(email);
 
     if (!user) {
       return res.status(401).json({
@@ -107,6 +99,9 @@ router.post('/login', async (req, res) => {
         message: 'Invalid Email or Password'
       });
     }
+
+    // Update last login
+    fileStorage.updateLastLogin(user.id);
 
     // Generate a simple token (in real app, use JWT)
     const token = `token_${user.id}_${Date.now()}`;
@@ -143,35 +138,9 @@ router.get('/logout', (req, res) => {
 router.get('/me', (req, res) => {
   // For demo purposes, return admin user
   // In real app, verify token and return actual user
-  const user = inMemoryDB.users.find(u => u.role === 'admin');
+  const user = fileStorage.getUserById('1'); // Admin user
   
-  res.status(200).json({
-    success: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    }
-  });
-});
-
-// Update user profile => /api/auth/me/update
-router.put('/me/update', (req, res) => {
-  try {
-    const { name, email, phone, address } = req.body;
-    
-    // For demo purposes, update admin user
-    // In real app, verify token and update actual user
-    const user = inMemoryDB.users.find(u => u.role === 'admin');
-    
-    if (user) {
-      user.name = name || user.name;
-      user.email = email || user.email;
-      user.phone = phone || user.phone;
-      user.address = address || user.address;
-    }
-
+  if (user) {
     res.status(200).json({
       success: true,
       user: {
@@ -181,6 +150,44 @@ router.put('/me/update', (req, res) => {
         role: user.role
       }
     });
+  } else {
+    res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+});
+
+// Update user profile => /api/auth/me/update
+router.put('/me/update', (req, res) => {
+  try {
+    const { name, email, phone, address } = req.body;
+    
+    // For demo purposes, update admin user
+    // In real app, verify token and update actual user
+    const updatedUser = fileStorage.updateUser('1', {
+      name: name || undefined,
+      email: email || undefined,
+      phone: phone || undefined,
+      address: address || undefined
+    });
+
+    if (updatedUser) {
+      res.status(200).json({
+        success: true,
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role
+        }
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
   } catch (error) {
     console.error('Profile update error:', error);
     res.status(500).json({
@@ -210,6 +217,31 @@ router.put('/password/update', (req, res) => {
     });
   } catch (error) {
     console.error('Password update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Admin: Get all users (for admin panel)
+router.get('/admin/users', (req, res) => {
+  try {
+    const users = fileStorage.getUsers().map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin
+    }));
+
+    res.status(200).json({
+      success: true,
+      users
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
