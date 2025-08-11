@@ -60,7 +60,7 @@ const Cart = () => {
         <div className="cart-content">
           <div className="cart-items">
             {cartItems.map((item) => (
-              <div key={item._id} className="cart-item">
+              <div key={item.id} className="cart-item">
                 <img 
                   src={item.images?.[0]?.url || item.image} 
                   alt={item.name} 
@@ -84,14 +84,14 @@ const Cart = () => {
                   <label>Quantity:</label>
                   <div className="quantity-controls">
                     <button 
-                      onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
                       disabled={item.quantity <= 1}
                     >
                       -
                     </button>
                     <span>{item.quantity}</span>
                     <button 
-                      onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       disabled={item.quantity >= 10}
                     >
                       +
@@ -110,7 +110,7 @@ const Cart = () => {
 
                 <button 
                   className="remove-item-btn"
-                  onClick={() => removeFromCart(item._id)}
+                  onClick={() => removeFromCart(item.id)}
                   aria-label="Remove item"
                 >
                   <FaTrash />
