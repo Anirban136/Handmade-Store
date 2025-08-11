@@ -209,6 +209,66 @@ app.get('/api/auth/logout', (req, res) => {
   });
 });
 
+// Cart and Order endpoints
+app.post('/api/orders/new', (req, res) => {
+  const { items, shippingInfo, paymentInfo } = req.body;
+  
+  if (!items || !shippingInfo) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide order items and shipping information'
+    });
+  }
+  
+  const newOrder = {
+    id: Date.now().toString(),
+    items: items.map(item => ({
+      product: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      image: item.images?.[0]?.url || ''
+    })),
+    shippingInfo,
+    paymentInfo,
+    orderStatus: 'pending',
+    createdAt: new Date().toISOString(),
+    totalAmount: items.reduce((total, item) => total + (item.price * item.quantity), 0)
+  };
+  
+  inMemoryDB.orders.push(newOrder);
+  
+  res.status(201).json({
+    success: true,
+    message: 'Order created successfully',
+    order: newOrder
+  });
+});
+
+app.get('/api/orders/:id', (req, res) => {
+  const order = inMemoryDB.orders.find(o => o.id === req.params.id);
+  if (order) {
+    res.json({
+      success: true,
+      order
+    });
+  } else {
+    res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+});
+
+app.get('/api/orders/me', (req, res) => {
+  // For demo purposes, return all orders
+  // In real app, filter by user ID from auth token
+  res.json({
+    success: true,
+    orders: inMemoryDB.orders
+  });
+});
+
 // Simple error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
