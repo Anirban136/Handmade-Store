@@ -131,8 +131,8 @@ const Products = () => {
         {!loading && !error && sortedProducts.length > 0 ? (
           <div className="products-grid">
             {sortedProducts.map((product) => (
-              <div key={product._id} className="product-card">
-                <Link to={`/product/${product._id}`}>
+              <div key={product.id} className="product-card">
+                <Link to={`/product/${product.id}`}>
                   <img 
                     src={product.images?.[0]?.url || product.image} 
                     alt={product.name} 
@@ -140,7 +140,7 @@ const Products = () => {
                   />
                 </Link>
                 <div className="product-info">
-                  <Link to={`/product/${product._id}`}>
+                  <Link to={`/product/${product.id}`}>
                     <h3 className="product-title">{product.name}</h3>
                   </Link>
                   <div className="product-rating">

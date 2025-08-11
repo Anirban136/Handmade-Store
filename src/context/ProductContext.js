@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import ApiService from '../services/api';
+import { products as localProducts } from '../data/products';
 
 const ProductContext = createContext();
 
@@ -36,18 +36,56 @@ export const ProductProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const queryParams = { ...filters, ...params };
-      const response = await ApiService.getProducts(queryParams);
+      let filteredProducts = [...localProducts];
       
-      setProducts(response.products);
+      // Apply keyword filter
+      if (params.keyword) {
+        filteredProducts = filteredProducts.filter(product =>
+          product.name.toLowerCase().includes(params.keyword.toLowerCase()) ||
+          product.description.toLowerCase().includes(params.keyword.toLowerCase())
+        );
+      }
+      
+      // Apply category filter
+      if (params.category && params.category !== 'All') {
+        filteredProducts = filteredProducts.filter(product =>
+          product.category === params.category
+        );
+      }
+      
+      // Apply price filters
+      if (params.minPrice) {
+        filteredProducts = filteredProducts.filter(product =>
+          product.price >= parseInt(params.minPrice)
+        );
+      }
+      
+      if (params.maxPrice) {
+        filteredProducts = filteredProducts.filter(product =>
+          product.price <= parseInt(params.maxPrice)
+        );
+      }
+      
+      // Apply rating filter
+      if (params.rating) {
+        filteredProducts = filteredProducts.filter(product =>
+          product.rating >= parseInt(params.rating)
+        );
+      }
+      
+      setProducts(filteredProducts);
       setPagination({
-        currentPage: parseInt(queryParams.page) || 1,
-        totalPages: Math.ceil(response.productsCount / response.resPerPage),
-        totalProducts: response.productsCount,
-        productsPerPage: response.resPerPage
+        currentPage: parseInt(params.page) || 1,
+        totalPages: Math.ceil(filteredProducts.length / 8),
+        totalProducts: filteredProducts.length,
+        productsPerPage: 8
       });
       
-      return response;
+      return {
+        products: filteredProducts,
+        productsCount: filteredProducts.length,
+        resPerPage: 8
+      };
     } catch (error) {
       setError(error.message);
       throw error;
@@ -61,8 +99,11 @@ export const ProductProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await ApiService.getProduct(id);
-      return response.product;
+      const product = localProducts.find(p => p.id === parseInt(id));
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      return { product };
     } catch (error) {
       setError(error.message);
       throw error;
