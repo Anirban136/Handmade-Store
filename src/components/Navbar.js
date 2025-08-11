@@ -51,6 +51,11 @@ const Navbar = () => {
           {isAuthenticated ? (
             <div className="user-menu">
               <span className="user-name">Hi, {user?.name}</span>
+              {user?.role === 'admin' && (
+                <Link to="/admin" className="admin-link">
+                  Admin Panel
+                </Link>
+              )}
               <button className="logout-btn" onClick={handleLogout}>
                 <FaSignOutAlt size={16} />
                 Logout

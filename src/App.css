@@ -156,6 +156,32 @@ body {
   font-size: 1.2rem;
 }
 
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-name {
+  color: #8B4513;
+  font-weight: 600;
+}
+
+.admin-link {
+  color: #e74c3c;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 2px solid #e74c3c;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.admin-link:hover {
+  background: #e74c3c;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .mobile-menu-btn {
     display: block;

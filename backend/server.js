@@ -10,6 +10,7 @@ const app = express();
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 
 // Middleware
 app.use(cors({
@@ -131,6 +132,9 @@ app.get('/api/products/:id', (req, res) => {
 
 // Use auth routes
 app.use('/api/auth', authRoutes);
+
+// Use admin routes
+app.use('/api/admin', adminRoutes);
 
 // Admin endpoint to view all users (for debugging)
 app.get('/api/admin/users', (req, res) => {
