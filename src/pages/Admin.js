@@ -88,7 +88,7 @@ const Admin = () => {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
     
     try {
       // Prepare product data without images first
@@ -148,7 +148,7 @@ const Admin = () => {
       console.error('Error:', error);
       alert('An error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
