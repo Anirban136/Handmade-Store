@@ -33,9 +33,7 @@ const Admin = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [compressionQuality, setCompressionQuality] = useState('auto');
-  const [customDimensions, setCustomDimensions] = useState({ width: '', height: '' });
-  const [showCompressionSettings, setShowCompressionSettings] = useState(false);
+  const [showImageSettings, setShowImageSettings] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -129,16 +127,24 @@ const Admin = () => {
         
         if (response.ok) {
           const result = await response.json();
-          const newProductId = result.product.id;
+          console.log('Product created:', result);
           
-          // If there are uploaded files, upload them to the new product
-          if (uploadedFiles.length > 0) {
-            await uploadFiles(newProductId);
+          if (result.product && result.product.id) {
+            const newProductId = result.product.id;
+            console.log('New product ID:', newProductId);
+            
+            // If there are uploaded files, upload them to the new product
+            if (uploadedFiles.length > 0) {
+              console.log('Uploading images to product:', newProductId);
+              await uploadFiles(newProductId);
+            }
+            
+            setShowProductForm(false);
+            fetchData();
+            alert('Product created successfully!');
+          } else {
+            throw new Error('Product created but no ID returned');
           }
-          
-          setShowProductForm(false);
-          fetchData();
-          alert('Product created successfully!');
         } else {
           const error = await response.json();
           alert(`Error: ${error.message}`);
@@ -146,7 +152,7 @@ const Admin = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('An error occurred. Please try again.');
+      alert(`An error occurred: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -199,49 +205,24 @@ const Admin = () => {
     console.log('Files to upload:', uploadedFiles);
     
     setIsUploading(true);
-    const formData = new FormData();
-    
-    uploadedFiles.forEach((fileObj, index) => {
-      formData.append('images', fileObj.file);
-      console.log(`Adding file ${index}:`, fileObj.name, fileObj.size);
-    });
-    
-    // Add compression settings
-    formData.append('compressionQuality', compressionQuality);
-    if (customDimensions.width) formData.append('maxWidth', customDimensions.width);
-    if (customDimensions.height) formData.append('maxHeight', customDimensions.height);
-    
-    console.log('Compression settings:', { compressionQuality, customDimensions });
     
     try {
-      // Try compression upload first
-      const uploadUrl = `${API_BASE_URL}/products/${productId}/upload-images`;
-      console.log('Trying compression upload to:', uploadUrl);
+      // Use simple upload endpoint directly
+      const formData = new FormData();
+      uploadedFiles.forEach((fileObj, index) => {
+        formData.append('images', fileObj.file);
+        console.log(`Adding file ${index}:`, fileObj.name, fileObj.size);
+      });
       
-      let response = await fetch(uploadUrl, {
+      const uploadUrl = `${API_BASE_URL}/products/${productId}/upload-simple-bulk`;
+      console.log('Uploading to:', uploadUrl);
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData
       });
       
       console.log('Upload response status:', response.status);
-      
-      // If compression upload fails, try simple upload
-      if (response.status === 404 || response.status === 500) {
-        console.log('Compression upload failed, trying simple upload...');
-        
-        // Create new FormData for simple upload
-        const simpleFormData = new FormData();
-        uploadedFiles.forEach((fileObj, index) => {
-          simpleFormData.append('images', fileObj.file);
-        });
-        
-        response = await fetch(`${API_BASE_URL}/products/${productId}/upload-simple-bulk`, {
-          method: 'POST',
-          body: simpleFormData
-        });
-        
-        console.log('Simple upload response status:', response.status);
-      }
       
       if (response.ok) {
         const result = await response.json();
@@ -254,18 +235,7 @@ const Admin = () => {
         }));
         setUploadedFiles([]);
         
-        // Show results
-        if (result.compression) {
-          const successCount = result.compression.successful;
-          const totalCount = result.compression.totalImages;
-          const avgCompression = result.compression.results
-            .filter(r => r.success && r.compressionRatio)
-            .reduce((sum, r) => sum + parseFloat(r.compressionRatio), 0) / successCount || 0;
-          
-          alert(`Images uploaded successfully!\n\n📊 Compression Results:\n• ${successCount}/${totalCount} images compressed\n• Average compression: ${avgCompression.toFixed(1)}%\n• Format: WebP for better quality`);
-        } else {
-          alert('Images uploaded successfully! (Simple upload mode)');
-        }
+        alert('Images uploaded successfully!');
       } else {
         const errorText = await response.text();
         console.error('Upload failed with status:', response.status);
@@ -286,33 +256,6 @@ const Admin = () => {
       alert(`Upload failed: ${error.message}`);
     } finally {
       setIsUploading(false);
-    }
-  };
-
-  // Fallback for basic image upload when compression features aren't available
-  const basicImageUpload = async (productId) => {
-    try {
-      console.log('Attempting basic image upload...');
-      
-      // For now, we'll just add the files to the form and let them be saved with the product
-      // This is a temporary solution until the backend compression is deployed
-      const fileUrls = uploadedFiles.map(fileObj => ({
-        url: URL.createObjectURL(fileObj.file),
-        name: fileObj.name,
-        isLocal: true
-      }));
-      
-      setProductForm(prev => ({
-        ...prev,
-        images: [...prev.images, ...fileUrls]
-      }));
-      
-      setUploadedFiles([]);
-      alert('Images added to product (basic mode - compression not available yet)');
-      
-    } catch (error) {
-      console.error('Basic upload error:', error);
-      alert('Basic upload failed. Please try again.');
     }
   };
 
@@ -634,11 +577,11 @@ const Admin = () => {
                     <label>Product Images</label>
                     <div className="image-upload-container">
                       <div className="image-upload-instructions">
-                        <p><strong>📸 Image Upload Options:</strong></p>
+                        <p><strong>📸 Image Upload:</strong></p>
                         <ul>
-                          <li><strong>Option 1:</strong> Upload files directly (drag & drop or click to select)</li>
-                          <li><strong>Option 2:</strong> Add image URLs from external sources</li>
-                          <li>Supported formats: JPG, PNG, WebP, GIF (max 5MB each)</li>
+                          <li>Upload files directly (drag & drop or click to select)</li>
+                          <li>Add image URLs from external sources</li>
+                          <li>Supported formats: JPG, PNG, WebP, GIF (max 10MB each)</li>
                           <li>First image will be the main product image</li>
                           <li>You can add multiple images for different angles</li>
                         </ul>
@@ -648,62 +591,25 @@ const Admin = () => {
                       <div className="file-upload-section">
                         <h4>📁 Upload Files:</h4>
                         
-                        {/* Compression Settings */}
-                        <div className="compression-settings">
+                        {/* Image Settings */}
+                        <div className="image-settings">
                           <button 
                             type="button" 
-                            className="compression-toggle-btn"
-                            onClick={() => setShowCompressionSettings(!showCompressionSettings)}
+                            className="image-settings-toggle-btn"
+                            onClick={() => setShowImageSettings(!showImageSettings)}
                           >
-                            <FaImage /> Compression Settings {showCompressionSettings ? '▼' : '▶'}
+                            <FaImage /> Image Settings {showImageSettings ? '▼' : '▶'}
                           </button>
                           
-                          {showCompressionSettings && (
-                            <div className="compression-options">
-                              <div className="compression-quality">
-                                <label>Compression Quality:</label>
-                                <select 
-                                  value={compressionQuality} 
-                                  onChange={(e) => setCompressionQuality(e.target.value)}
-                                >
-                                  <option value="auto">🤖 Auto (Smart Detection)</option>
-                                  <option value="high">🔥 High (70% - Small files, fast loading)</option>
-                                  <option value="medium">⚡ Medium (85% - Balanced quality/size)</option>
-                                  <option value="low">💎 Low (95% - High quality, larger files)</option>
-                                </select>
-                              </div>
-                              
-                              <div className="custom-dimensions">
-                                <label>Custom Dimensions (optional):</label>
-                                <div className="dimension-inputs">
-                                  <input
-                                    type="number"
-                                    placeholder="Max Width (px)"
-                                    value={customDimensions.width}
-                                    onChange={(e) => setCustomDimensions(prev => ({ ...prev, width: e.target.value }))}
-                                    min="100"
-                                    max="2000"
-                                  />
-                                  <span>×</span>
-                                  <input
-                                    type="number"
-                                    placeholder="Max Height (px)"
-                                    value={customDimensions.height}
-                                    onChange={(e) => setCustomDimensions(prev => ({ ...prev, height: e.target.value }))}
-                                    min="100"
-                                    max="2000"
-                                  />
-                                </div>
-                                <small>Leave empty to use quality-based auto-sizing</small>
-                              </div>
-                              
-                              <div className="compression-info">
-                                <p><strong>💡 Smart Features:</strong></p>
+                          {showImageSettings && (
+                            <div className="image-settings-options">
+                              <div className="image-info">
+                                <p><strong>💡 Upload Features:</strong></p>
                                 <ul>
-                                  <li>🔄 Automatic format conversion to WebP</li>
-                                  <li>📐 Smart resizing with aspect ratio preservation</li>
-                                  <li>🎯 Quality-based compression recommendations</li>
-                                  <li>🧹 Original files automatically cleaned up</li>
+                                  <li>🔄 Direct file upload to server</li>
+                                  <li>📐 Original image dimensions preserved</li>
+                                  <li>🎯 High quality image storage</li>
+                                  <li>🧹 Automatic file management</li>
                                 </ul>
                               </div>
                             </div>
@@ -728,7 +634,7 @@ const Admin = () => {
                           <label htmlFor="file-upload" className="file-input-label">
                             <FaUpload className="upload-icon" />
                             <span>Drag & drop images here or click to select</span>
-                            <small>Max 10 images, 10MB each (will be compressed)</small>
+                            <small>Max 10 images, 10MB each</small>
                           </label>
                         </div>
                         
