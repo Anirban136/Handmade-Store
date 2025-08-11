@@ -39,11 +39,11 @@ export const CartProvider = ({ children }) => {
   // Add item to cart
   const addToCart = (product, quantity = 1) => {
     setCartItems(prevItems => {
-      const existingItem = prevItems.find(item => item._id === product._id);
+      const existingItem = prevItems.find(item => item.id === product.id);
       
       if (existingItem) {
         return prevItems.map(item =>
-          item._id === product._id
+          item.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
@@ -55,7 +55,7 @@ export const CartProvider = ({ children }) => {
 
   // Remove item from cart
   const removeFromCart = (productId) => {
-    setCartItems(prevItems => prevItems.filter(item => item._id !== productId));
+    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
   };
 
   // Update item quantity
@@ -67,7 +67,7 @@ export const CartProvider = ({ children }) => {
     
     setCartItems(prevItems =>
       prevItems.map(item =>
-        item._id === productId ? { ...item, quantity } : item
+        item.id === productId ? { ...item, quantity } : item
       )
     );
   };
@@ -95,7 +95,7 @@ export const CartProvider = ({ children }) => {
   // Get cart items for order
   const getOrderItems = () => {
     return cartItems.map(item => ({
-      product: item._id,
+      product: item.id,
       name: item.name,
       price: item.discount > 0 
         ? item.price - (item.price * item.discount / 100)
@@ -141,12 +141,12 @@ export const CartProvider = ({ children }) => {
 
   // Check if product is in cart
   const isInCart = (productId) => {
-    return cartItems.some(item => item._id === productId);
+    return cartItems.some(item => item.id === productId);
   };
 
   // Get item quantity in cart
   const getItemQuantity = (productId) => {
-    const item = cartItems.find(item => item._id === productId);
+    const item = cartItems.find(item => item.id === productId);
     return item ? item.quantity : 0;
   };
 
