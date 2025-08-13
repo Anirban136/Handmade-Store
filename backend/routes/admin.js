@@ -1,13 +1,15 @@
 const express = require('express');
-const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { fileStorage } = require('../utils/fileStorage');
-const ImageCompressor = require('../utils/imageCompressor');
+const router = express.Router();
 
-// Initialize image compressor
-const imageCompressor = new ImageCompressor();
+// Import shared database
+const { inMemoryDB, saveProducts, loadProducts } = require('../database');
+
+// Import utilities
+// const imageCompressor = require('../utils/imageCompressor');
+const { fileStorage } = require('../utils/fileStorage');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -29,7 +31,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Increased to 10MB for original files
+    fileSize: 10 * 1024 * 1024, // Maximum: 10MB
   },
   fileFilter: (req, file, cb) => {
     // Check file type
@@ -38,86 +40,16 @@ const upload = multer({
     const mimetype = allowedTypes.test(file.mimetype);
     
     if (mimetype && extname) {
+      // Check minimum file size (10KB)
+      if (file.size < 10 * 1024) {
+        return cb(new Error('File size must be at least 10KB'));
+      }
       return cb(null, true);
     } else {
       cb(new Error('Only image files are allowed!'));
     }
   }
 });
-
-// In-memory data storage (shared with server.js)
-const inMemoryDB = {
-  products: [
-    {
-      id: '1',
-      name: 'Handcrafted Ceramic Mug',
-      description: 'Beautiful hand-thrown ceramic mug with a rustic finish.',
-      price: 1999,
-      category: 'Pottery',
-      images: [{ url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop' }],
-      stock: 15,
-      isActive: true,
-      featured: true
-    },
-    {
-      id: '2',
-      name: 'Woven Cotton Throw Blanket',
-      description: 'Soft, handwoven cotton throw blanket in warm earth tones.',
-      price: 7499,
-      category: 'Textiles',
-      images: [{ url: 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=400&h=400&fit=crop' }],
-      stock: 8,
-      isActive: true,
-      featured: true
-    },
-    {
-      id: '3',
-      name: 'Sterling Silver Pendant Necklace',
-      description: 'Elegant sterling silver pendant necklace with a hand-carved design.',
-      price: 12499,
-      category: 'Jewelry',
-      images: [{ url: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop' }],
-      stock: 12,
-      isActive: true,
-      featured: false
-    }
-  ],
-  orders: []
-};
-
-// Helper function to save products to file
-const saveProducts = () => {
-  try {
-    const dataDir = path.join(__dirname, '../data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    
-    const productsFile = path.join(dataDir, 'products.json');
-    fs.writeFileSync(productsFile, JSON.stringify(inMemoryDB, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Error saving products:', error);
-    return false;
-  }
-};
-
-// Helper function to load products from file
-const loadProducts = () => {
-  try {
-    const productsFile = path.join(__dirname, '../data/products.json');
-    if (fs.existsSync(productsFile)) {
-      const data = JSON.parse(fs.readFileSync(productsFile, 'utf8'));
-      inMemoryDB.products = data.products || inMemoryDB.products;
-      inMemoryDB.orders = data.orders || inMemoryDB.orders;
-    }
-  } catch (error) {
-    console.error('Error loading products:', error);
-  }
-};
-
-// Load products on startup
-loadProducts();
 
 // ===== PRODUCT MANAGEMENT =====
 
@@ -160,18 +92,25 @@ router.post('/products', (req, res) => {
       stock: parseInt(stock) || 0,
       isActive: isActive !== undefined ? isActive : true,
       featured: featured || false,
+      rating: 0,
+      reviews: 0,
       createdAt: new Date().toISOString()
     };
 
     inMemoryDB.products.push(newProduct);
     
+    console.log('🆕 Product added to inMemoryDB:', newProduct.id, newProduct.name);
+    console.log('📊 Total products in database:', inMemoryDB.products.length);
+    
     if (saveProducts()) {
+      console.log('✅ Product saved to file successfully');
       res.status(201).json({
         success: true,
         message: 'Product created successfully',
         product: newProduct
       });
     } else {
+      console.log('❌ Failed to save product to file');
       res.status(500).json({
         success: false,
         message: 'Failed to save product'
@@ -420,12 +359,37 @@ router.post('/products/:id/upload-image', upload.single('image'), async (req, re
     if (maxHeight) compressionOptions.maxHeight = parseInt(maxHeight);
     
     // Compress the image
-    const compressionResult = await imageCompressor.compressImage(
-      originalPath, 
-      compressedPath, 
-      compressionOptions
-    );
+    // const compressionResult = await imageCompressor.compressImage(
+    //   originalPath, 
+    //   compressedPath, 
+    //   compressionOptions
+    // );
     
+    // For now, just use the original file without compression
+    const newImageUrl = `/uploads/products/${req.file.filename}`;
+    product.images.push({ url: newImageUrl });
+    product.updatedAt = new Date().toISOString();
+    
+    // Don't delete the original file - we need it for serving
+    // fs.unlinkSync(originalPath);
+    
+    if (saveProducts()) {
+      res.json({
+        success: true,
+        message: 'Image uploaded successfully (no compression)',
+        product,
+        compression: { success: false, reason: 'Compression disabled' }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save product'
+      });
+    }
+    return;
+    
+    // Original compression logic commented out
+    /*
     if (!compressionResult.success) {
       // If compression fails, use original file
       const newImageUrl = `/uploads/products/${req.file.filename}`;
@@ -479,6 +443,7 @@ router.post('/products/:id/upload-image', upload.single('image'), async (req, re
         message: 'Failed to save product'
       });
     }
+    */
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({
@@ -595,37 +560,27 @@ router.post('/products/:id/upload-images', upload.array('images', 10), async (re
       if (maxHeight) compressionOptions.maxHeight = parseInt(maxHeight);
       
       // Compress the image
-      const compressionResult = await imageCompressor.compressImage(
-        originalPath, 
-        compressedPath, 
-        compressionOptions
-      );
+      // const compressionResult = await imageCompressor.compressImage(
+      //   originalPath, 
+      //   compressedPath, 
+      //   compressionOptions
+      // );
       
-      if (compressionResult.success) {
-        // Use compressed image
-        const newImageUrl = `/uploads/products/${path.basename(compressedPath)}`;
-        newImages.push({ url: newImageUrl });
-        compressionResults.push({
-          filename: file.originalname,
-          success: true,
-          originalSize: `${(compressionResult.originalSize / (1024 * 1024)).toFixed(2)} MB`,
-          compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(2)} MB`,
-          compressionRatio: compressionResult.compressionRatio,
-          dimensions: compressionResult.dimensions
-        });
-        
-        // Clean up original file
-        fs.unlinkSync(originalPath);
-      } else {
-        // If compression fails, use original file
-        const newImageUrl = `/uploads/products/${file.filename}`;
-        newImages.push({ url: newImageUrl });
-        compressionResults.push({
-          filename: file.originalname,
-          success: false,
-          reason: 'Compression failed'
-        });
-      }
+      // For now, just use the original file without compression
+      const newImageUrl = `/uploads/products/${file.filename}`;
+      newImages.push({ url: newImageUrl });
+      compressionResults.push({
+        filename: file.originalname,
+        success: true,
+        originalSize: `${(fs.statSync(originalPath).size / (1024 * 1024)).toFixed(2)} MB`,
+        compressedSize: `${(fs.statSync(compressedPath).size / (1024 * 1024)).toFixed(2)} MB`,
+        compressionRatio: 1, // No compression
+        dimensions: { width: 0, height: 0 }, // No compression
+        format: 'original'
+      });
+      
+      // Clean up original file
+      fs.unlinkSync(originalPath);
     }
     
     product.images.push(...newImages);
@@ -732,44 +687,60 @@ router.post('/products/:id/upload-simple', upload.single('image'), (req, res) =>
 // Simple bulk upload without compression (fallback)
 router.post('/products/:id/upload-simple-bulk', upload.array('images', 10), (req, res) => {
   try {
+    console.log('🖼️ Image upload request received');
+    console.log('📁 Files received:', req.files ? req.files.length : 'No files');
+    console.log('🔍 Product ID:', req.params.id);
+    
     const { id } = req.params;
     const product = inMemoryDB.products.find(p => p.id === id);
     
     if (!product) {
+      console.log('❌ Product not found in database');
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
     
+    console.log('✅ Product found:', product.name);
+    
     if (!req.files || req.files.length === 0) {
+      console.log('❌ No files in request');
       return res.status(400).json({
         success: false,
         message: 'No files uploaded.'
       });
     }
     
+    console.log('📸 Processing files:', req.files.map(f => ({ name: f.originalname, size: f.size, path: f.path })));
+    
     const newImages = req.files.map(file => ({
       url: `/uploads/products/${file.filename}`
     }));
     
+    console.log('🖼️ New image URLs:', newImages);
+    
     product.images.push(...newImages);
     product.updatedAt = new Date().toISOString();
     
+    console.log('💾 Saving product to database...');
+    
     if (saveProducts()) {
+      console.log('✅ Product saved successfully');
       res.json({
         success: true,
         message: `${newImages.length} images uploaded successfully`,
         product
       });
     } else {
+      console.log('❌ Failed to save product');
       res.status(500).json({
         success: false,
         message: 'Failed to save product'
       });
     }
   } catch (error) {
-    console.error('Error uploading images:', error);
+    console.error('❌ Error uploading images:', error);
     res.status(500).json({
       success: false,
       message: 'Error uploading images'

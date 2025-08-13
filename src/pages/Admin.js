@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaStar, FaEye, FaUsers, FaBox, FaShoppingCart, FaChartBar, FaTimes, FaUpload, FaImage } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { useProducts } from '../context/ProductContext';
 import './Admin.css';
 
-const API_BASE_URL = 'https://handycurv-backend.onrender.com/api/admin';
+const API_BASE_URL = 'http://localhost:5003/api/admin';
 
 const Admin = () => {
   const { user, isAdmin } = useAuth();
+  const { refreshProducts } = useProducts();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
@@ -14,6 +16,7 @@ const Admin = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showRefreshNotification, setShowRefreshNotification] = useState(false);
 
   // Form states
   const [showProductForm, setShowProductForm] = useState(false);
@@ -114,6 +117,8 @@ const Admin = () => {
           setShowProductForm(false);
           setEditingProduct(null);
           fetchData();
+          // Refresh the main website product data
+          await refreshProducts();
           alert('Product updated successfully!');
         } else {
           const error = await response.json();
@@ -142,6 +147,9 @@ const Admin = () => {
             if (uploadedFiles.length > 0) {
               console.log('Uploading images to product:', newProductId);
               try {
+                // Add a small delay to ensure the product is fully saved
+                alert('Product created successfully! Now uploading images...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 await uploadFiles(newProductId);
               } catch (uploadError) {
                 console.error('Image upload failed:', uploadError);
@@ -151,6 +159,8 @@ const Admin = () => {
             
             setShowProductForm(false);
             fetchData();
+            // Refresh the main website product data
+            await refreshProducts();
             alert('Product created successfully!');
           } else {
             console.error('Product created but no ID returned:', result);
@@ -166,6 +176,9 @@ const Admin = () => {
                 // Try to upload images to the found product
                 if (uploadedFiles.length > 0) {
                   try {
+                    // Add a small delay to ensure the product is fully saved
+                    alert('Product created successfully! Now uploading images...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     await uploadFiles(foundProduct.id);
                   } catch (uploadError) {
                     console.error('Image upload failed:', uploadError);
@@ -175,6 +188,8 @@ const Admin = () => {
                 
                 setShowProductForm(false);
                 fetchData();
+                // Refresh the main website product data
+                await refreshProducts();
                 alert('Product created successfully!');
                 return;
               }
@@ -248,6 +263,22 @@ const Admin = () => {
     console.log('Starting file upload for product:', productId);
     console.log('Files to upload:', uploadedFiles);
     
+    // First, verify the product exists
+    try {
+      const productCheckResponse = await fetch(`${API_BASE_URL}/products/${productId}`);
+      if (!productCheckResponse.ok) {
+        console.error('Product check failed:', productCheckResponse.status);
+        alert('Cannot upload images: Product not found. Please refresh the page and try again.');
+        return;
+      }
+      const productCheck = await productCheckResponse.json();
+      console.log('Product found:', productCheck.product);
+    } catch (error) {
+      console.error('Error checking product:', error);
+      alert('Cannot verify product exists. Please refresh the page and try again.');
+      return;
+    }
+    
     setIsUploading(true);
     
     try {
@@ -255,11 +286,18 @@ const Admin = () => {
       const formData = new FormData();
       uploadedFiles.forEach((fileObj, index) => {
         formData.append('images', fileObj.file);
-        console.log(`Adding file ${index}:`, fileObj.name, fileObj.size);
+        console.log(`Adding file ${index}:`, fileObj.name, fileObj.size, fileObj.type);
       });
       
       const uploadUrl = `${API_BASE_URL}/products/${productId}/upload-simple-bulk`;
       console.log('Uploading to:', uploadUrl);
+      console.log('FormData contents:', formData);
+      
+      console.log('🚀 Sending request to:', uploadUrl);
+      console.log('📁 FormData entries:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value instanceof File ? `${value.name} (${value.size} bytes)` : value);
+      }
       
       const response = await fetch(uploadUrl, {
         method: 'POST',
@@ -289,6 +327,38 @@ const Admin = () => {
         try {
           const error = JSON.parse(errorText);
           errorMessage = error.message || errorMessage;
+          
+          // Handle specific error cases
+          if (error.message === 'Product not found') {
+            errorMessage = 'Product not found. Please try refreshing the page and uploading again.';
+            
+            // Try to retry after a longer delay
+            console.log('Product not found, retrying after 3 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            const retryResponse = await fetch(uploadUrl, {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (retryResponse.ok) {
+              const retryResult = await retryResponse.json();
+              console.log('Retry successful:', retryResult);
+              
+              setProductForm(prev => ({
+                ...prev,
+                images: [...prev.images, ...retryResult.product.images.slice(-uploadedFiles.length)]
+              }));
+              setUploadedFiles([]);
+              
+              alert('Images uploaded successfully on retry!');
+              return;
+            } else {
+              const retryErrorText = await retryResponse.text();
+              console.error('Retry also failed:', retryErrorText);
+              errorMessage = 'Product not found even after retry. Please refresh the page.';
+            }
+          }
         } catch (e) {
           errorMessage = `Upload failed with status ${response.status}`;
         }
@@ -335,6 +405,8 @@ const Admin = () => {
       if (response.ok) {
         alert('Product deleted successfully!');
         fetchData(); // Refresh data
+        // Refresh the main website product data
+        await refreshProducts();
       } else {
         const error = await response.json();
         alert(`Error: ${error.message}`);
@@ -357,6 +429,8 @@ const Admin = () => {
 
       if (response.ok) {
         fetchData(); // Refresh data
+        // Refresh the main website product data
+        await refreshProducts();
       } else {
         alert('Failed to update featured status');
       }
@@ -407,6 +481,22 @@ const Admin = () => {
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
         <p>Welcome back, {user?.name}!</p>
+        <button 
+          className="refresh-btn"
+          onClick={async () => {
+            setShowRefreshNotification(true);
+            await refreshProducts();
+            setTimeout(() => setShowRefreshNotification(false), 3000);
+          }}
+          title="Refresh main website data"
+        >
+          🔄 Refresh Website Data
+        </button>
+        {showRefreshNotification && (
+          <div className="refresh-notification">
+            ✅ Main website data refreshed successfully!
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}

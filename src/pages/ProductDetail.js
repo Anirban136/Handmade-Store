@@ -1,23 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FaStar, FaHeart, FaShare, FaTruck, FaShieldAlt, FaUndo } from 'react-icons/fa';
-import { products } from '../data/products';
+import { useProducts } from '../context/ProductContext';
 import { formatPrice } from '../utils/priceFormatter';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const { getProduct } = useProducts();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    const foundProduct = products.find(p => p.id === parseInt(id));
-    setProduct(foundProduct);
-  }, [id]);
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const result = await getProduct(id);
+        setProduct(result.product);
+      } catch (error) {
+        console.error('Error fetching product:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProduct();
+  }, [id, getProduct]);
+  
+  if (loading) {
+    return (
+      <div className="container">
+        <div className="loading-state">
+          <p>Loading product...</p>
+        </div>
+      </div>
+    );
+  }
   
   if (!product) {
     return (
@@ -31,13 +54,10 @@ const ProductDetail = () => {
     );
   }
 
-  // Mock additional images for gallery
-  const productImages = [
-    product.image,
-    product.image.replace('w=400&h=400', 'w=400&h=400&fit=crop&crop=center'),
-    product.image.replace('w=400&h=400', 'w=400&h=400&fit=crop&crop=top'),
-    product.image.replace('w=400&h=400', 'w=400&h=400&fit=crop&crop=bottom')
-  ];
+  // Get product images from the API data
+  const productImages = product.images && product.images.length > 0 
+    ? product.images.map(img => img.url)
+    : ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'];
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
@@ -65,7 +85,11 @@ const ProductDetail = () => {
           {/* Product Images */}
           <div className="product-images">
             <div className="main-image">
-              <img src={productImages[selectedImage]} alt={product.name} />
+              <img 
+                src={productImages[selectedImage]} 
+                alt={product.name} 
+                style={{ opacity: 1 }}
+              />
             </div>
             <div className="image-thumbnails">
               {productImages.map((image, index) => (
@@ -75,6 +99,7 @@ const ProductDetail = () => {
                   alt={`${product.name} ${index + 1}`}
                   className={selectedImage === index ? 'active' : ''}
                   onClick={() => setSelectedImage(index)}
+                  style={{ opacity: 1 }}
                 />
               ))}
             </div>
@@ -88,10 +113,10 @@ const ProductDetail = () => {
               {[...Array(5)].map((_, i) => (
                 <FaStar 
                   key={i} 
-                  className={i < Math.floor(product.rating) ? 'star filled' : 'star'} 
+                  className={i < Math.floor((product.rating || 0)) ? 'star filled' : 'star'} 
                 />
               ))}
-              <span className="rating-text">{product.rating} ({product.reviews} reviews)</span>
+              <span className="rating-text">{product.rating || 0} ({product.reviews || 0} reviews)</span>
             </div>
 
             <div className="product-price">{formatPrice(product.price)}</div>
@@ -106,8 +131,8 @@ const ProductDetail = () => {
             </div>
 
             <div className="product-availability">
-              <span className={`status ${product.inStock ? 'in-stock' : 'out-of-stock'}`}>
-                {product.inStock ? 'In Stock' : 'Out of Stock'}
+              <span className={`status ${(product.stock && product.stock > 0) ? 'in-stock' : 'out-of-stock'}`}>
+                {(product.stock && product.stock > 0) ? 'In Stock' : 'Out of Stock'}
               </span>
             </div>
 
@@ -143,7 +168,7 @@ const ProductDetail = () => {
                 <button 
                   className="add-to-cart-btn large"
                   onClick={handleAddToCart}
-                  disabled={!product.inStock}
+                  disabled={!(product.stock && product.stock > 0)}
                 >
                   Add to Cart
                 </button>
@@ -198,44 +223,12 @@ const ProductDetail = () => {
         <div className="related-products">
           <h2>You might also like</h2>
           <div className="products-grid">
-            {products
-              .filter(p => p.category === product.category && p.id !== product.id)
-              .slice(0, 3)
-              .map((relatedProduct) => (
-                <div key={relatedProduct.id} className="product-card">
-                  <Link to={`/product/${relatedProduct.id}`}>
-                    <img src={relatedProduct.image} alt={relatedProduct.name} className="product-image" />
-                  </Link>
-                  <div className="product-info">
-                    <Link to={`/product/${relatedProduct.id}`}>
-                      <h3 className="product-title">{relatedProduct.name}</h3>
-                    </Link>
-                                        <p className="product-price">{formatPrice(relatedProduct.price)}</p>
-                    <div className="product-actions">
-                      <button 
-                        className="add-to-cart-btn" 
-                        onClick={() => addToCart(relatedProduct)}
-                      >
-                        Add to Cart
-                      </button>
-                                           <button 
-                       className={`wishlist-btn ${isInWishlist(relatedProduct.id) ? 'active' : ''}`}
-                       onClick={(e) => {
-                         e.preventDefault();
-                         e.stopPropagation();
-                         toggleWishlist(relatedProduct);
-                       }}
-                       onTouchStart={(e) => {
-                         e.preventDefault();
-                         e.stopPropagation();
-                       }}
-                     >
-                       <FaHeart />
-                     </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {/* Assuming products are available in the context or fetched elsewhere */}
+            {/* For now, we'll use a placeholder or fetch related products */}
+            {/* Example: products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 3) */}
+            {/* This part needs to be implemented based on how related products are managed */}
+            {/* For now, we'll just show a placeholder or remove if not available */}
+            <p>Related products feature is under development.</p>
           </div>
         </div>
       </div>

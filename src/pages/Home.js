@@ -82,7 +82,17 @@ const Home = () => {
 
       {/* Featured Products */}
       <section className="products-section">
-        <h2 className="section-title">Featured Products</h2>
+        <div className="section-header">
+          <h2 className="section-title">Featured Products</h2>
+          <button 
+            className="refresh-featured-btn"
+            onClick={() => fetchProducts()}
+            disabled={loading}
+            title="Refresh featured products"
+          >
+            {loading ? '🔄 Refreshing...' : '🔄 Refresh'}
+          </button>
+        </div>
         {loading ? (
           <div className="loading-container">
             <div className="loading-spinner"></div>
@@ -97,6 +107,7 @@ const Home = () => {
                     src={product.images && product.images.length > 0 ? product.images[0].url : 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'} 
                     alt={product.name} 
                     className="product-image" 
+                    style={{ opacity: 1 }}
                   />
                 </Link>
                 <div className="product-info">

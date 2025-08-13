@@ -64,7 +64,8 @@ const Cart = () => {
                 <img 
                   src={item.images?.[0]?.url || item.image} 
                   alt={item.name} 
-                  className="cart-item-image" 
+                  className="cart-item-image"
+                  style={{ opacity: 1 }}
                 />
                 
                 <div className="cart-item-details">

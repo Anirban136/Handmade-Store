@@ -6,6 +6,9 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
+// Import shared database
+const { inMemoryDB } = require('./database');
+
 const app = express();
 
 // Import routes
@@ -15,10 +18,11 @@ const adminRoutes = require('./routes/admin');
 // Middleware
 app.use(cors({
   origin: [
-    'https://handycurv.vercel.app',
-    'https://handycurv-frontend.vercel.app',
+    process.env.CORS_ORIGIN || 'https://handmade-store-delta.vercel.app',
     /^https:\/\/.*\.vercel\.app$/,
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -34,46 +38,6 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// In-memory data storage
-const inMemoryDB = {
-  products: [
-    {
-      id: '1',
-      name: 'Handcrafted Ceramic Mug',
-      description: 'Beautiful hand-thrown ceramic mug with a rustic finish.',
-      price: 1999,
-      category: 'Pottery',
-      images: [{ url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop' }],
-      stock: 15,
-      isActive: true,
-      featured: true
-    },
-    {
-      id: '2',
-      name: 'Woven Cotton Throw Blanket',
-      description: 'Soft, handwoven cotton throw blanket in warm earth tones.',
-      price: 7499,
-      category: 'Textiles',
-      images: [{ url: 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=400&h=400&fit=crop' }],
-      stock: 8,
-      isActive: true,
-      featured: true
-    },
-    {
-      id: '3',
-      name: 'Sterling Silver Pendant Necklace',
-      description: 'Elegant sterling silver pendant necklace with a hand-carved design.',
-      price: 12499,
-      category: 'Jewelry',
-      images: [{ url: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop' }],
-      stock: 12,
-      isActive: true,
-      featured: false
-    }
-  ],
-  orders: []
-};
 
 console.log('✅ Using in-memory storage for products and orders');
 console.log('✅ Using file storage for user authentication');
@@ -102,6 +66,22 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug endpoint to see database state
+app.get('/api/debug/database', (req, res) => {
+  res.json({
+    success: true,
+    totalProducts: inMemoryDB.products.length,
+    activeProducts: inMemoryDB.products.filter(p => p.isActive).length,
+    products: inMemoryDB.products.map(p => ({
+      id: p.id,
+      name: p.name,
+      isActive: p.isActive,
+      featured: p.featured
+    })),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -109,10 +89,14 @@ app.use('/api/admin', adminRoutes);
 // Public products endpoint
 app.get('/api/products', (req, res) => {
   try {
+    const activeProducts = inMemoryDB.products.filter(product => product.isActive);
+    console.log('🌐 Public API: Returning', activeProducts.length, 'active products');
+    console.log('📊 Total products in database:', inMemoryDB.products.length);
+    
     res.json({
       success: true,
-      products: inMemoryDB.products.filter(product => product.isActive),
-      total: inMemoryDB.products.filter(product => product.isActive).length
+      products: activeProducts,
+      total: activeProducts.length
     });
   } catch (error) {
     console.error('Error getting products:', error);
@@ -251,7 +235,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 app.listen(PORT, () => {
   console.log(`🚀 HandyCurv Backend running on port ${PORT}`);

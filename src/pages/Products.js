@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaStar, FaSearch, FaHeart, FaSpinner } from 'react-icons/fa';
 import { useProducts } from '../context/ProductContext';
@@ -18,12 +18,11 @@ const Products = () => {
 
   // Fetch products when component mounts
   useEffect(() => {
-    console.log('Products page loading, fetching products...');
     fetchProducts();
   }, [fetchProducts]);
 
-  // Handle search
-  const handleSearch = (e) => {
+  // Handle search with debouncing
+  const handleSearch = useCallback((e) => {
     const value = e.target.value;
     setSearchTerm(value);
     if (value.trim()) {
@@ -31,31 +30,45 @@ const Products = () => {
     } else {
       clearFilters();
     }
-  };
+  }, [searchProducts, clearFilters]);
 
   // Handle category filter
-  const handleCategoryChange = (category) => {
+  const handleCategoryChange = useCallback((category) => {
     if (category === 'All') {
       clearFilters();
     } else {
       filterByCategory(category);
     }
-  };
+  }, [clearFilters, filterByCategory]);
 
-  // Sort products
-  const sortedProducts = [...products].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low':
-        return a.price - b.price;
-      case 'price-high':
-        return b.price - a.price;
-      case 'rating':
-        return b.rating - a.rating;
-      case 'name':
-      default:
-        return a.name.localeCompare(b.name);
-    }
-  });
+  // Memoize sorted products to prevent unnecessary re-renders
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-low':
+          return a.price - b.price;
+        case 'price-high':
+          return b.price - a.price;
+        case 'rating':
+          return b.rating - a.rating;
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+  }, [products, sortBy]);
+
+  // Memoize the add to cart handler
+  const handleAddToCart = useCallback((product) => {
+    addToCart(product);
+  }, [addToCart]);
+
+  // Memoize the wishlist toggle handler
+  const handleWishlistToggle = useCallback((e, product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(product);
+  }, [toggleWishlist]);
 
   return (
     <div className="products-page">
@@ -64,6 +77,17 @@ const Products = () => {
         <div className="page-header">
           <h1 className="page-title">Our Handmade Collection</h1>
           <p>Discover unique, handcrafted treasures made with love and care</p>
+          <div className="refresh-indicator">
+            {loading && <FaSpinner className="spinner" />}
+            <button 
+              className="refresh-products-btn"
+              onClick={() => fetchProducts()}
+              disabled={loading}
+              title="Refresh products"
+            >
+              {loading ? 'Refreshing...' : '🔄 Refresh'}
+            </button>
+          </div>
         </div>
 
         {/* Filters and Search */}
@@ -138,59 +162,78 @@ const Products = () => {
         {/* Products Grid */}
         {!loading && !error && sortedProducts.length > 0 ? (
           <div className="products-grid">
-            {sortedProducts.map((product) => (
-              <div key={product.id} className="product-card">
-                <Link to={`/product/${product.id}`}>
-                  <img 
-                    src={product.images && product.images.length > 0 ? product.images[0].url : 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'} 
-                    alt={product.name} 
-                    className="product-image" 
-                  />
-                </Link>
-                <div className="product-info">
+            {sortedProducts.map((product) => {
+              const imageUrl = product.images && product.images.length > 0 ? product.images[0].url : undefined;
+              
+              // Debug logging
+              console.log('Product:', product.name, 'Image URL:', imageUrl, 'Images array:', product.images);
+              
+              return (
+                <div key={product.id} className="product-card">
                   <Link to={`/product/${product.id}`}>
-                    <h3 className="product-title">{product.name}</h3>
-                  </Link>
-                  <div className="product-rating">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar 
-                        key={i} 
-                        className={i < Math.floor(product.rating || 0) ? 'star filled' : 'star'} 
+                    <div className="product-image-container">
+                      <img
+                        src={imageUrl || "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop"}
+                        alt={product.name}
+                        className="product-image"
+                        onLoad={(e) => {
+                          console.log('Image loaded successfully:', e.target.src);
+                          e.target.classList.add('loaded');
+                        }}
+                        onError={(e) => {
+                          console.error('Image failed to load:', e.target.src);
+                          e.target.src = "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop";
+                          e.target.classList.add('loaded');
+                        }}
+                        style={{ opacity: 1, maxWidth: '100%', height: 'auto' }}
                       />
-                    ))}
-                    <span className="rating-text">({product.reviews || 0})</span>
-                  </div>
-                  <p className="product-price">{formatPrice(product.price)}</p>
-                  {product.discount > 0 && (
-                    <p className="product-discount">Save {product.discount}%</p>
-                  )}
-                  <p className="product-description">{product.description.substring(0, 120)}...</p>
-                  <div className="product-actions">
-                    <button 
-                      className="add-to-cart-btn" 
-                      onClick={() => addToCart(product)}
-                    >
-                      Add to Cart
-                    </button>
-                    <button 
-                      className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleWishlist(product);
-                      }}
-                      onTouchStart={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                    >
-                      <FaHeart />
-                    </button>
+                    </div>
+                  </Link>
+                  <div className="product-info">
+                    <Link to={`/product/${product.id}`}>
+                      <h3 className="product-title">{product.name}</h3>
+                    </Link>
+                    <div className="product-rating">
+                      {[...Array(5)].map((_, i) => (
+                        <FaStar 
+                          key={i} 
+                          className={i < Math.floor((product.rating || 0)) ? 'star filled' : 'star'} 
+                        />
+                      ))}
+                      <span className="rating-text">({product.reviews || 0})</span>
+                    </div>
+                    <p className="product-price">{formatPrice(product.price)}</p>
+                    {product.discount && product.discount > 0 && (
+                      <p className="product-discount">Save {product.discount}%</p>
+                    )}
+                    <p className="product-description">
+                      {product.description && product.description.length > 120 
+                        ? `${product.description.substring(0, 120)}...` 
+                        : product.description || 'No description available'}
+                    </p>
+                    <div className="product-actions">
+                      <button 
+                        className="add-to-cart-btn" 
+                        onClick={() => handleAddToCart(product)}
+                      >
+                        Add to Cart
+                      </button>
+                      <button 
+                        className={`wishlist-btn ${isInWishlist(product.id) ? 'active' : ''}`}
+                        onClick={(e) => handleWishlistToggle(e, product)}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                      >
+                        <FaHeart />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : !loading && !error ? (
           <div className="no-results">

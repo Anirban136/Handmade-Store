@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: handycurv-backend
+    name: handmade-store-backend
     env: node
     plan: free
     buildCommand: cd backend && npm install
@@ -10,5 +10,9 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: FRONTEND_URL
-        value: https://handycurv.vercel.app 
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://handmade-store-delta.vercel.app
+    healthCheckPath: /api/health
+    autoDeploy: true 

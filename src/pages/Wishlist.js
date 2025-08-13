@@ -62,7 +62,11 @@ const Wishlist = () => {
           {wishlist.map((product) => (
             <div key={product.id} className="wishlist-item">
               <div className="wishlist-item-image">
-                <img src={product.image} alt={product.name} />
+                <img 
+                  src={product.images && product.images.length > 0 ? product.images[0].url : 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'} 
+                  alt={product.name}
+                  style={{ opacity: 1 }}
+                />
               </div>
               <div className="wishlist-item-info">
                 <h3 className="wishlist-item-title">{product.name}</h3>
@@ -77,7 +81,9 @@ const Wishlist = () => {
                 </div>
                 <p className="wishlist-item-price">{formatPrice(product.price)}</p>
                 <p className="wishlist-item-description">
-                  {product.description.substring(0, 100)}...
+                  {product.description && product.description.length > 100 
+                    ? `${product.description.substring(0, 100)}...` 
+                    : product.description || 'No description available'}
                 </p>
                 <div className="wishlist-item-actions">
                   <button 

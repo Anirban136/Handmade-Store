@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const ProductContext = createContext();
 
@@ -29,14 +29,14 @@ export const ProductProvider = ({ children }) => {
     productsPerPage: 8
   });
 
-  // Fetch products with filters
-  const fetchProducts = async (params = {}) => {
+  // Memoize the fetchProducts function to prevent unnecessary re-renders
+  const fetchProducts = useCallback(async (params = {}) => {
     try {
       setLoading(true);
       setError(null);
       
       // Fetch products from backend API
-      const response = await fetch('https://handycurv-backend.onrender.com/api/products');
+      const response = await fetch('http://localhost:5003/api/products');
       
       if (!response.ok) {
         throw new Error('Failed to fetch products');
@@ -108,16 +108,62 @@ export const ProductProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Add a refresh function to manually refresh products
+  const refreshProducts = useCallback(async () => {
+    console.log('🔄 Manually refreshing products...');
+    try {
+      setLoading(true);
+      const result = await fetchProducts();
+      console.log('✅ Products refreshed successfully:', result.productsCount, 'products found');
+      return result;
+    } catch (error) {
+      console.error('❌ Error refreshing products:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProducts]);
+
+  // Memoize other functions to prevent re-renders
+  const searchProducts = useCallback(async (keyword) => {
+    await fetchProducts({ keyword, page: 1 });
+  }, [fetchProducts]);
+
+  const filterByCategory = useCallback(async (category) => {
+    await fetchProducts({ category, page: 1 });
+  }, [fetchProducts]);
+
+  const filterByPrice = useCallback(async (minPrice, maxPrice) => {
+    await fetchProducts({ minPrice, maxPrice, page: 1 });
+  }, [fetchProducts]);
+
+  const filterByRating = useCallback(async (rating) => {
+    await fetchProducts({ rating, page: 1 });
+  }, [fetchProducts]);
+
+  const clearFilters = useCallback(async () => {
+    const clearedFilters = {
+      keyword: '',
+      category: '',
+      minPrice: '',
+      maxPrice: '',
+      rating: '',
+      page: 1
+    };
+    setFilters(clearedFilters);
+    await fetchProducts(clearedFilters);
+  }, [fetchProducts]);
 
   // Get single product
-  const getProduct = async (id) => {
+  const getProduct = useCallback(async (id) => {
     try {
       setLoading(true);
       setError(null);
       
       // Fetch single product from backend API
-      const response = await fetch(`https://handycurv-backend.onrender.com/api/products/${id}`);
+      const response = await fetch(`http://localhost:5003/api/products/${id}`);
       
       if (!response.ok) {
         throw new Error('Product not found');
@@ -131,53 +177,66 @@ export const ProductProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Search products
-  const searchProducts = async (keyword) => {
-    await fetchProducts({ keyword, page: 1 });
-  };
-
-  // Filter products by category
-  const filterByCategory = async (category) => {
-    await fetchProducts({ category, page: 1 });
-  };
-
-  // Filter products by price range
-  const filterByPrice = async (minPrice, maxPrice) => {
-    await fetchProducts({ minPrice, maxPrice, page: 1 });
-  };
-
-  // Filter products by rating
-  const filterByRating = async (rating) => {
-    await fetchProducts({ rating, page: 1 });
-  };
-
-  // Clear all filters
-  const clearFilters = async () => {
-    const clearedFilters = {
-      keyword: '',
-      category: '',
-      minPrice: '',
-      maxPrice: '',
-      rating: '',
-      page: 1
-    };
-    setFilters(clearedFilters);
-    await fetchProducts(clearedFilters);
-  };
-
-  // Load products on component mount
-  useEffect(() => {
-    fetchProducts();
   }, []);
 
   // Update filters state
-  const updateFilters = (newFilters) => {
+  const updateFilters = useCallback((newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
-  };
+  }, []);
 
-  const value = {
+  // Load products only once on component mount
+  useEffect(() => {
+    // Create a local function to avoid dependency issues
+    const loadInitialProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('http://localhost:5003/api/products');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        
+        const data = await response.json();
+        const allProducts = data.products || [];
+        
+        setProducts(allProducts);
+        setPagination({
+          currentPage: 1,
+          totalPages: Math.ceil(allProducts.length / 8),
+          totalProducts: allProducts.length,
+          productsPerPage: 8
+        });
+      } catch (error) {
+        console.error('Error loading initial products:', error);
+        setError(error.message);
+        setProducts([]);
+        setPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalProducts: 0,
+          productsPerPage: 8
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadInitialProducts();
+    
+    // Set up periodic refresh every 30 seconds to keep data in sync
+    const intervalId = setInterval(() => {
+      console.log('🔄 Auto-refreshing products...');
+      loadInitialProducts();
+    }, 30000); // 30 seconds
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array to run only once
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     products,
     loading,
     error,
@@ -190,8 +249,24 @@ export const ProductProvider = ({ children }) => {
     filterByPrice,
     filterByRating,
     clearFilters,
-    updateFilters
-  };
+    updateFilters,
+    refreshProducts
+  }), [
+    products,
+    loading,
+    error,
+    filters,
+    pagination,
+    fetchProducts,
+    getProduct,
+    searchProducts,
+    filterByCategory,
+    filterByPrice,
+    filterByRating,
+    clearFilters,
+    updateFilters,
+    refreshProducts
+  ]);
 
   return (
     <ProductContext.Provider value={value}>
