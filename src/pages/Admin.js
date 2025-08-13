@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductContext';
 import './Admin.css';
 
-const API_BASE_URL = 'http://localhost:5003/api/admin';
+const API_BASE_URL = 'http://localhost:8000/api/admin';
 
 const Admin = () => {
   const { user, isAdmin } = useAuth();
